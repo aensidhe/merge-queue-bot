@@ -1,0 +1,19 @@
+{
+  "name": "telegram_bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "3.4.0",
+    "config": "1.21.0",
+    "github": "1.1.2",
+    "httpdispatcher": "1.0.0",
+    "node-telegram-bot-api": "0.23.3",
+    "redis": "2.6.2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+    "redis": {
+        "url": "redis://127.0.0.1:7000",
+        "prefix": "merge:queue:"
+    },
+    "telegram": {
+        "token": "YOUR TOKEN GOES HERE"
+    },
+    "acl": {
+        "su": [
+            164380278
+        ]
+    }
+}
