@@ -12,12 +12,6 @@ let bot = new TelegramBot(config.get('telegram').token, {polling: true});
 let github = require('./github.js');
 let co = require('co');
 
-function checkIfChatPrivate(msg) {
-    if (msg.chat.type != 'private') {
-        throw { messageFromBot: 'All token operation supported only in private chats' };
-    }
-}
-
 function hasAdminAccess(msg) {
     let acl = config.get('acl');
     for (let i = 0; i < acl.su.length; i++) {
@@ -30,7 +24,7 @@ function hasAdminAccess(msg) {
 
 function* sendToMultipleChats(bot, message, chatIds) {
     let outbox = [];
-    chatIds.forEach(function (chatId) {
+    chatIds.forEach(chatId => {
         outbox.push(bot.sendMessage(
             chatId,
             message,
@@ -39,15 +33,18 @@ function* sendToMultipleChats(bot, message, chatIds) {
     yield outbox;
 }
 
-function* generalErrorHandler(reason, currentChatId) {
-    if (reason.messageFromBot) {
-        console.log(reason.messageFromBot);
-        yield bot.sendMessage(
-            currentChatId,
-            reason.messageFromBot);
+function* sendMessageToAllRepoChats(user, repo, message) {
+    let chats = new Set(yield client.smembersAsync('repo_chats:' + user + '/' + repo));
+    for (var i = 3; i < arguments.length; i++) {
+        if (arguments[i] != undefined && arguments[i] != null)
+            chats.add(arguments[i].toString());
     }
 
-    console.error(reason);
+    yield sendToMultipleChats(
+        bot,
+        'PR [#' + id + '](' + pr.html_url + ') is added to queue by @' + msg.from.username,
+        chats
+    );
 }
 
 function* onAddPullRequest(msg, args) {
@@ -71,21 +68,162 @@ function* onAddPullRequest(msg, args) {
         client.zaddAsync(user + '/' + repo + '/queue', new Date().getTime(), id)
     ];
 
-    let chats = new Set(members);
-    chats.add(msg.chat.id.toString());
-    yield sendToMultipleChats(
-        bot,
+    yield sendMessageToAllRepoChats(
+        user,
+        repo,
         'PR [#' + id + '](' + pr.html_url + ') is added to queue by @' + msg.from.username,
-        chats
-    );
+        msg.chat.id);
 }
 
-function* handle(handler, msg, args) {
+function* onRemovePullRequest(msg, args) {
+    const user = args[1];
+    const repo = args[2];
+    const id = args[3];
+
+    const prData = yield client.hgetallAsync(user + '/' + repo + '/' + id);
+    if (!prData)
+        throw { messageFromBot: 'PR not found' };
+
+    yield [
+        client.delAsync(user + '/' + repo + '/' + id),
+        client.zremAsync(user + '/' + repo + '/queue', id)
+    ];
+
+    yield sendMessageToAllRepoChats(
+        user,
+        repo,
+        'PR [#' + id + '](' + prData.url + ') is removed from queue by @' + msg.from.username,
+        msg.chat.id,
+        prData.userid);
+
+    const next = yield client.zrangebyscoreAsync([user + '/' + repo + '/queue', '-inf', '+inf', 'LIMIT', '0', '1']);
+    const next_pr = yield client.hgetallAsync(user + '/' + repo + '/' + next);
+
+    if (next_pr)
+        yield sendMessageToAllRepoChats(
+            user,
+            repo,
+            'PR [#' + next_pr.id + '](' + next_pr.url + ') by @' + next_pr.username + ' is next in queue!',
+            msg.chat.id,
+            next_pr.userid);
+    else
+        yield sendMessageToAllRepoChats(
+            user,
+            repo,
+            'Queue is empty!',
+            msg.chat.id);
+}
+
+function* reportQueueToChat(repo, chatId) {
+    let message = 'Queue for ' + repo + ' is empty';
+    const queue = yield client.zrangebyscoreAsync(repos[i] + '/queue', '-inf', '+inf');
+    if (queue.length > 0) {
+        message = 'Queue for ' + repo + '\n';
+        for (let j = 0; j < queue.length; j++) {
+            message += '- #' + queue[j] + '\n';
+        }
+    }
+
+    yield bot.sendMessage(
+        chatId,
+        message,
+        { parse_mode: 'Markdown' });
+}
+
+function* onQueueRequestHandler(msg, args) {
+    let repositoriesToReport = yield client.smembersAsync('repo_chats:' + msg.chat.id.toString());
+    let reports = [];
+    repositoriesToReport.forEach(repo => {
+        reports.push(co(reportQueueToChat(repo, msg.chat.id)));
+    })
+
+    yield reports;
+}
+
+function* onAddTokenHandler(msg, args) {
+    const name = args[1];
+    const token = args[2];
+    yield client.hsetAsync('tokens', name, token);
+    yield bot.sendMessage(
+        msg.chat.id,
+        'Token <' + name + '> saved successfully.');
+}
+
+function* onRemoveTokenHandler(msg, args) {
+    const name = args[1];
+    yield client.hdelAsync('tokens', name);
+    yield bot.sendMessage(
+        msg.chat.id,
+        'Token <' + name + '> deleted successfully.');
+}
+
+function* onMapTokenHandler(msg, args) {
+    const user = args[1];
+    const token = args[2];
+    yield client.hsetAsync('user_to_token_map', user, token);
+    yield bot.sendMessage(
+        msg.chat.id,
+        'Token <' + token + '> will be used as an access to <' + user + '>');
+}
+
+function* onBindRepoToChat(msg, args) {
+    const user = args[1];
+    const repo = args[2];
+
+    yield [
+        client.saddAsync('repo_chats:' + msg.chat.id.toString(), user + '/' + repo),
+        client.saddAsync('repo_chats:' + user + '/' + repo, msg.chat.id)
+    ];
+
+    yield bot.sendMessage(
+        msg.chat.id,
+        'This chat has been mapped to merge queue of ' + user + '/' + repo);
+}
+
+function* onUnbindRepoToChat(msg, args) {
+    const user = args[1];
+    const repo = args[2];
+
+    yield [
+        client.sremAsync('repo_chats:' + msg.chat.id.toString(), user + '/' + repo),
+        client.sremAsync('repo_chats:' + user + '/' + repo, msg.chat.id)
+    ];
+
+    yield bot.sendMessage(
+        msg.chat.id,
+        'This chat has been unmapped from merge queue of ' + user + '/' + repo);
+}
+
+function* generalErrorHandler(reason, currentChatId) {
+    if (reason.messageFromBot) {
+        console.log(reason.messageFromBot);
+        yield bot.sendMessage(
+            currentChatId,
+            reason.messageFromBot);
+    }
+
+    console.error(reason);
+}
+
+function* handle(handler, msg, args, options) {
+    options = options || {};
+    if (options.adminOnly && !hasAdminAccess(msg))
+        return;
+
+    if (options.privateOnly && msg.chat.type != 'private')
+    {
+        yield bot.sendMessage(
+            msg.chat.id,
+            'This operation supported only in private chat',
+            { reply_to_message_id: msg.id });
+        return;
+    }
+
     try {
         yield handler(msg, args);
     }
     catch(e) {
-        yield generalErrorHandler(e, msg.chat.id)
+        yield generalErrorHandler(e, msg.chat.id);
     }
 }
 
@@ -95,166 +233,44 @@ bot.onText(new RegExp('/add ' + githubPattern), function (msg, args) {
 });
 
 bot.onText(new RegExp('/remove ' + githubPattern), function (msg, args) {
-    let user = args[1];
-    let repo = args[2];
-    let id = args[3];
-    let prData = {};
-    let prChatIds = [];
-
-    client
-        .hgetallAsync(user + '/' + repo + '/' + id)
-        .then(function(result) {
-            if (!result) {
-                throw { messageFromBot: 'PR not found' };
-            }
-            prData = result;
-
-            return client.delAsync(user + '/' + repo + '/' + id);
-        })
-        .then(function() { return client.zremAsync(user + '/' + repo + '/queue', id); })
-        .then(function() { return client.smembersAsync('repo_chats:' + user + '/' + repo); })
-        .then(function(members) {
-            prChatIds = members;
-            let deletedChats = new Set(members);
-            deletedChats.add(msg.chat.id.toString());
-            deletedChats.add(prData.userid);
-            return sendToMultipleChats(
-                bot,
-                'PR [#' + id + '](' + prData.url + ') is removed from queue by @' + msg.from.username,
-                deletedChats
-            );
-        })
-        .then(function() { return client.zrangebyscoreAsync([user + '/' + repo + '/queue', '-inf', '+inf', 'LIMIT', '0', '1']); })
-        .then(function(next) { return client.hgetallAsync(user + '/' + repo + '/' + next); })
-        .then(function(next_pr) {
-            let nextChats = new Set(prChatIds);
-
-            let nextMessage = 'Queue is empty!';
-            if (next_pr) {
-                nextMessage = 'PR [#' + next_pr.id + '](' + next_pr.url + ') by @' + next_pr.username + ' is next in queue!'
-                nextChats.add(next_pr.userid);
-            }
-
-            return sendToMultipleChats(
-                bot,
-                nextMessage,
-                nextChats
-            );
-        })
-        .catch(function(reason) { return generalErrorHandler(reason, msg.chat.id); });
+    return co(handle(onRemovePullRequest, msg, args));
 });
 
 bot.onText(/\/queue/, function (msg, args) {
-    let repositoriesToReport = [];
-    client
-        .smembersAsync('repo_chats:' + msg.chat.id.toString())
-        .then(function(repos) {
-            repositoriesToReport = repos;
-            let queues = [];
-            for (let i = 0; i < repos.length; i++)
-            {
-                queues.push(client.zrangebyscoreAsync(repos[i] + '/queue', '-inf', '+inf'));
-            }
-            return Promise.all(queues);
-        })
-        .then(function(queues) {
-            let outbox = [];
-            for (let i = 0; i < repositoriesToReport.length; i++)
-            {
-                let repo = repositoriesToReport[i];
-
-                let message = 'Queue for ' + repo + ' is empty';
-                if (queues[i].length > 0) {
-                    message = 'Queue for ' + repo + '\n';
-                    for (let j = 0; j < queues[i].length; j++) {
-                        message += '- #' + queues[i][j] + '\n';
-                    }
-                }
-
-                outbox.push(bot.sendMessage(
-                    msg.chat.id,
-                    message,
-                    { parse_mode: 'Markdown' }));
-            }
-            return Promise.all(outbox);
-        })
-        .catch(function(reason) { return generalErrorHandler(reason, msg.chat.id); });
+    return co(handle(onQueueRequestHandler, msg, args));
 });
 
 bot.onText(/\/add_token (\S+) (\S+)/, function(msg, args) {
-    if (!hasAdminAccess(msg))
-        return;
-
-    let name = args[1];
-    let token = args[2];
-    checkIfChatPrivate(msg)
-        .then(function() { return client.hsetAsync('tokens', name, token); })
-        .then(function() { return bot.sendMessage(
-            msg.chat.id,
-            'Token <' + name + '> saved successfully.');
-        })
-        .catch(function(reason) { return generalErrorHandler(reason, msg.chat.id); });
+    return co(handle(onAddTokenHandler, msg, args, {
+        adminOnly: true,
+        privateOnly: true
+    }));
 });
 
 bot.onText(/\/remove_token (\S+)/, function(msg, args) {
-    if (!hasAdminAccess(msg))
-        return;
-
-    let name = args[1];
-    checkIfChatPrivate(msg)
-        .then(function() { return client.hdelAsync('tokens', name); })
-        .then(function() { return bot.sendMessage(
-            msg.chat.id,
-            'Token <' + name + '> deleted successfully.');
-        })
-        .catch(function(reason) { return generalErrorHandler(reason, msg.chat.id); });
+    return co(handle(onRemoveTokenHandler, msg, args, {
+        adminOnly: true,
+        privateOnly: true
+    }));
 });
 
 bot.onText(/\/map_token (\S+) (\S+)/, function(msg, args) {
-    if (!hasAdminAccess(msg))
-        return;
-
-    let user = args[1];
-    let token = args[2]
-    checkIfChatPrivate(msg)
-        .then(function() { return client.hsetAsync('user_to_token_map', user, token); })
-        .then(function() { return bot.sendMessage(
-            msg.chat.id,
-            'Token <' + token + '> will be used as an access to <' + user + '>');
-        })
-        .catch(function(reason) { return generalErrorHandler(reason, msg.chat.id); });
+    return co(handle(onMapTokenHandler, msg, args, {
+        adminOnly: true,
+        privateOnly: true
+    }))
 });
 
 bot.onText(/\/bind (\S+) (\S+)/, function(msg, args) {
-    if (!hasAdminAccess(msg))
-        return;
-
-    let user = args[1];
-    let repo = args[2];
-    client
-        .saddAsync('repo_chats:' + msg.chat.id.toString(), user + '/' + repo)
-        .then(function() { return client.saddAsync('repo_chats:' + user + '/' + repo, msg.chat.id); })
-        .then(function() { return bot.sendMessage(
-            msg.chat.id,
-            'This chat has been mapped to merge queue of ' + user + '/' + repo)
-        })
-        .catch(console.error);
+    return co(handle(onBindRepoToChat, msg, args, {
+        adminOnly: true
+    }));
 });
 
 bot.onText(/\/unbind (\S+) (\S+)/, function(msg, args) {
-    if (!hasAdminAccess(msg))
-        return;
-
-    let user = args[1];
-    let repo = args[2];
-    client
-        .sremAsync('repo_chats:' + msg.chat.id.toString(), user + '/' + repo)
-        .then(function () { return client.sremAsync('repo_chats:' + user + '/' + repo, msg.chat.id); })
-        .then(function () { return bot.sendMessage(
-            msg.chat.id,
-            'This chat has been unmapped from merge queue of ' + user + '/' + repo)
-        })
-        .catch(console.error);
+    return co(handle(onUnbindRepoToChat, msg, args, {
+        adminOnly: true
+    }));
 });
 
 // let dispatcher = require('./httpdispatcher');
