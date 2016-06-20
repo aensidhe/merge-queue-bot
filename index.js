@@ -40,11 +40,7 @@ function* sendMessageToAllRepoChats(user, repo, message) {
             chats.add(arguments[i].toString());
     }
 
-    yield sendToMultipleChats(
-        bot,
-        'PR [#' + id + '](' + pr.html_url + ') is added to queue by @' + msg.from.username,
-        chats
-    );
+    yield sendToMultipleChats(bot, message, chats);
 }
 
 function* onAddPullRequest(msg, args) {
@@ -115,19 +111,22 @@ function* onRemovePullRequest(msg, args) {
 }
 
 function* reportQueueToChat(repo, chatId) {
-    let message = 'Queue for ' + repo + ' is empty';
-    const queue = yield client.zrangebyscoreAsync(repos[i] + '/queue', '-inf', '+inf');
-    if (queue.length > 0) {
-        message = 'Queue for ' + repo + '\n';
-        for (let j = 0; j < queue.length; j++) {
-            message += '- #' + queue[j] + '\n';
-        }
+    const queue = yield client.zrangebyscoreAsync(repo + '/queue', '-inf', '+inf');
+    if (!queue || queue.length == 0)
+    {
+        yield bot.sendMessage(chatId, 'Queue for ' + repo + ' is empty', { parse_mode: 'Markdown' });
+        return;
     }
 
-    yield bot.sendMessage(
-        chatId,
-        message,
-        { parse_mode: 'Markdown' });
+    let prGetters = [];
+    queue.forEach(prId => {
+        prGetters.push(client.hgetallAsync(repo + '/' + prId));
+    });
+    const prs = yield prGetters;
+    let message = 'Queue for ' + repo + '\n';
+    prs.forEach(pr => message += '- [#' + pr.id + '](' + pr.url + ') by @' + pr.username + '\n');
+
+    yield bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
 }
 
 function* onQueueRequestHandler(msg, args) {
