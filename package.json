@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "bluebird": "3.4.0",
+    "co": "4.6.0",
     "config": "1.21.0",
     "github": "1.1.2",
     "httpdispatcher": "1.0.0",
