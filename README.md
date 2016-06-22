@@ -1,0 +1,1 @@
+This bot can manage merge queue for your github repo. Useful, if you're using protected branches and a lot of people are working on software.

@@ -4,7 +4,9 @@
         "prefix": "merge:queue:"
     },
     "telegram": {
-        "token": "YOUR TOKEN GOES HERE"
+        "token": "YOUR TOKEN GOES HERE",
+        "sendGreetings": true,
+        "sendFarewells": true
     },
     "acl": {
         "su": [

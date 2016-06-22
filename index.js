@@ -1,25 +1,34 @@
 'use strict'
 
-let config = require('config');
-let redisConfig = config.get('redis');
-let redis = require('redis');
-let P = require('bluebird')
+const config = require('config');
+const redisConfig = config.get('redis');
+const redis = require('redis');
+const P = require('bluebird')
 P.promisifyAll(redis.RedisClient.prototype);
-let client = redis.createClient(redisConfig);
+const client = redis.createClient(redisConfig);
 
-let TelegramBot = require('node-telegram-bot-api');
-let bot = new TelegramBot(config.get('telegram').token, {polling: true});
-let github = require('./github.js');
-let co = require('co');
+const TelegramBot = require('node-telegram-bot-api');
+const telegramConfig = config.get('telegram');
+const bot = new TelegramBot(telegramConfig.token, {polling: true});
+const github = require('./github.js');
+const co = require('co');
+
+const acl = config.get('acl');
 
 function hasAdminAccess(msg) {
-    let acl = config.get('acl');
     for (let i = 0; i < acl.su.length; i++) {
         if (acl.su[i] == msg.from.id)
             return true;
     }
 
     return false;
+}
+
+function getUserMention(user) {
+    if (user.username)
+        return "@" + user.username;
+
+    return user.first_name;
 }
 
 function* sendToMultipleChats(bot, message, chatIds) {
@@ -48,6 +57,9 @@ function* onAddPullRequest(msg, args) {
     const repo = args[2];
     const id = args[3];
 
+    if (!msg.user)
+        throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
+
     const tokenName = yield client.hgetAsync('user_to_token_map', user);
     if (!tokenName)
         throw { messageFromBot: 'Token for your repo is not found.' };
@@ -58,6 +70,8 @@ function* onAddPullRequest(msg, args) {
         client.hmsetAsync(user + '/' + repo + '/' + id, {
             userid: msg.from.id,
             username: msg.from.username,
+            first_name: msg.from.first_name,
+            last_name: msg.from.last_name,
             url: pr.html_url,
             id: id
         }),
@@ -67,7 +81,7 @@ function* onAddPullRequest(msg, args) {
     yield sendMessageToAllRepoChats(
         user,
         repo,
-        'PR [#' + id + '](' + pr.html_url + ') is added to queue by @' + msg.from.username,
+        'PR [#' + id + '](' + pr.html_url + ') is added to queue by ' + getUserMention(msg.from),
         msg.chat.id);
 }
 
@@ -88,7 +102,7 @@ function* onRemovePullRequest(msg, args) {
     yield sendMessageToAllRepoChats(
         user,
         repo,
-        'PR [#' + id + '](' + prData.url + ') is removed from queue by @' + msg.from.username,
+        'PR [#' + id + '](' + prData.url + ') is removed from queue by ' + getUserMention(msg.from),
         msg.chat.id,
         prData.userid);
 
@@ -99,7 +113,7 @@ function* onRemovePullRequest(msg, args) {
         yield sendMessageToAllRepoChats(
             user,
             repo,
-            'PR [#' + next_pr.id + '](' + next_pr.url + ') by @' + next_pr.username + ' is next in queue!',
+            'PR [#' + next_pr.id + '](' + next_pr.url + ') by ' + getUserMention(next_pr) + ' is next in queue!',
             msg.chat.id,
             next_pr.userid);
     else
@@ -124,7 +138,7 @@ function* reportQueueToChat(repo, chatId) {
     });
     const prs = yield prGetters;
     let message = 'Queue for ' + repo + '\n';
-    prs.forEach(pr => message += '- [#' + pr.id + '](' + pr.url + ') by @' + pr.username + '\n');
+    prs.forEach(pr => message += '- [#' + pr.id + '](' + pr.url + ') by ' + getUserMention(pr) + '\n');
 
     yield bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
 }
@@ -226,52 +240,52 @@ function* handle(handler, msg, args, options) {
     }
 }
 
+function* onSigTerm() {
+    if (telegramConfig.sendFarewells)
+        yield sendToMultipleChats(bot, "Bot exited.", acl.su);
+    process.exit(0);
+}
+
+function* onStartup() {
+    if (telegramConfig.sendGreetings)
+        yield sendToMultipleChats(bot, "Bot started.", acl.su);
+}
+
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
-bot.onText(new RegExp('/add ' + githubPattern), function (msg, args) {
-    return co(handle(onAddPullRequest, msg, args));
-});
+bot.onText(new RegExp('/add ' + githubPattern), (msg, args) => co(handle(onAddPullRequest, msg, args)));
 
-bot.onText(new RegExp('/remove ' + githubPattern), function (msg, args) {
-    return co(handle(onRemovePullRequest, msg, args));
-});
+bot.onText(new RegExp('/remove ' + githubPattern), (msg, args) => co(handle(onRemovePullRequest, msg, args)));
 
-bot.onText(/\/queue/, function (msg, args) {
-    return co(handle(onQueueRequestHandler, msg, args));
-});
+bot.onText(/\/queue/, (msg, args) => co(handle(onQueueRequestHandler, msg, args)));
 
-bot.onText(/\/add_token (\S+) (\S+)/, function(msg, args) {
-    return co(handle(onAddTokenHandler, msg, args, {
+bot.onText(/\/add_token (\S+) (\S+)/, (msg, args) => co(handle(onAddTokenHandler, msg, args, {
         adminOnly: true,
         privateOnly: true
-    }));
-});
+    })));
 
-bot.onText(/\/remove_token (\S+)/, function(msg, args) {
-    return co(handle(onRemoveTokenHandler, msg, args, {
+bot.onText(/\/remove_token (\S+)/, (msg, args) => co(handle(onRemoveTokenHandler, msg, args, {
         adminOnly: true,
         privateOnly: true
-    }));
-});
+    })));
 
-bot.onText(/\/map_token (\S+) (\S+)/, function(msg, args) {
-    return co(handle(onMapTokenHandler, msg, args, {
+bot.onText(/\/map_token (\S+) (\S+)/, (msg, args) => co(handle(onMapTokenHandler, msg, args, {
         adminOnly: true,
         privateOnly: true
-    }))
-});
+    })));
 
-bot.onText(/\/bind (\S+) (\S+)/, function(msg, args) {
-    return co(handle(onBindRepoToChat, msg, args, {
+bot.onText(/\/bind (\S+) (\S+)/, (msg, args) => co(handle(onBindRepoToChat, msg, args, {
         adminOnly: true
-    }));
-});
+    })));
 
-bot.onText(/\/unbind (\S+) (\S+)/, function(msg, args) {
-    return co(handle(onUnbindRepoToChat, msg, args, {
+bot.onText(/\/unbind (\S+) (\S+)/, (msg, args) => co(handle(onUnbindRepoToChat, msg, args, {
         adminOnly: true
-    }));
-});
+    })));
 
+bot.onText(/\/ping/, () => bot.sendMessage(msg.chat.id, 'pong'));
+
+process.on('SIGTERM', () => co(onSigTerm));
+
+co(onStartup);
 // let dispatcher = require('./httpdispatcher');
 
 // dispatcher.onPost();
