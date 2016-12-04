@@ -1,7 +1,8 @@
 {
   "name": "telegram_bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "Telegram bot for merge queue process",
+  "repository": "https://github.com/aensidhe/merge-queue-bot",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
