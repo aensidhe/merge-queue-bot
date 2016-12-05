@@ -28,7 +28,13 @@ function getUserMention(user) {
     if (user.username)
         return `@${user.username}`;
 
-    return user.first_name;
+    let result = nil;
+    if (user.last_name)
+        result = user.last_name;
+
+    if (user.first_name)
+        result = result ? `${user.first_name} {result} ` : user.first_name;
+    return result ? result : user.id.toString();
 }
 
 function* sendToMultipleChats(bot, message, chatIds) {
@@ -65,7 +71,7 @@ function* onAddPullRequest(msg, args) {
         throw { messageFromBot: 'Token for your repo is not found.' };
 
     const token = yield client.hgetAsync('tokens', tokenName);
-    const pr = yield github.getPrState(user, repo, id, token);
+    const pr = yield github.get_pull_request_state(user, repo, id, token);
     yield [
         client.hmsetAsync(`${user}/${repo}/${id}`, {
             userid: msg.from.id,
