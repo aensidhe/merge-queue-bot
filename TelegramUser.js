@@ -15,12 +15,12 @@ class TelegramUser {
         if (this._username)
             return `@${this._username}`;
 
-        let result = nil;
+        let result;
         if (this._lastName)
             result = this._lastName;
 
         if (this._firstName)
-            result = result ? `${this._firstName} {result} ` : this._firstName;
+            result = result ? `${this._firstName} {result}` : this._firstName;
 
         return result ? result : this._id.toString();
     }

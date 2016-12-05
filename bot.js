@@ -145,7 +145,7 @@ class Bot {
 
         try {
             return co(handler, msg, args)
-                .catch(e => this._handleError(e, msg.chat.Id));
+                .catch(e => this._handleError(e, msg.chat.id));
         }
         catch(e) {
             return this._handleError(e, msg.chat.Id);

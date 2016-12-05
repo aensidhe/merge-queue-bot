@@ -50,7 +50,7 @@ class RedisDal {
         if (!nextId) {
             return null;
         }
-        return this.getPullRequest(repository, nextId);
+        return yield this.getPullRequest(repository, nextId);
     }
 
     _getPullRequestKey(repository, id) {
