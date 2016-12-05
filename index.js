@@ -2,9 +2,14 @@ const config = require('config');
 const GitHubClient = require('./GitHubClient.js');
 const Bot = require('./Bot.js');
 const co = require('co');
+const RedisDal = require('./RedisDal.js');
 
 const github = new GitHubClient();
-const bot = new Bot(github, config.get('acl'));
+const bot = new Bot(
+    github,
+    config.get('acl'),
+    new RedisDal(config.get('redis')),
+    config.get('telegram'));
 
 function* onSigTerm(reason) {
     yield bot.sendFarewell(reason);

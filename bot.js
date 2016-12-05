@@ -1,20 +1,23 @@
+const co = require('co');
+const TelegramBot = require('node-telegram-bot-api');
+const Repository = require('./Repository.js')
+
+const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
+
 const config = require('config');
 const redisConfig = config.get('redis');
 const redis = require('redis');
-const P = require('bluebird')
-const co = require('co');
-const TelegramBot = require('node-telegram-bot-api');
-
+const P = require('bluebird');
 P.promisifyAll(redis.RedisClient.prototype);
 const client = redis.createClient(redisConfig);
-const telegramConfig = config.get('telegram');
-const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
 class Bot {
-    constructor(gitHubClient, acl) {
+    constructor(gitHubClient, acl, redisDal, telegramConfig) {
         this._acl = acl;
         this._gitHubClient = gitHubClient;
-        this._bot = new TelegramBot(telegramConfig.token, {polling: true});
+        this._telegramConfig = telegramConfig;
+        this._redisDal = redisDal;
+        this._bot = new TelegramBot(this._telegramConfig.token, {polling: true});
 
         this._bot.onText(
             new RegExp(`/add ${githubPattern}`),
@@ -90,7 +93,8 @@ class Bot {
     }
 
     * _sendMessageToAllRepoChats(user, repo, message) {
-        let chats = new Set(yield client.smembersAsync(`repo_chats:${user}/${repo}`));
+        const repository = new Repository(user, repo);
+        let chats = new Set(yield this._redisDal.getAllChatsForRepo(repository));
         for (var i = 3; i < arguments.length; i++) {
             if (arguments[i] != undefined && arguments[i] != null)
                 chats.add(arguments[i].toString());
@@ -156,15 +160,12 @@ class Bot {
         const user = args[1];
         const repo = args[2];
         const id = args[3];
+        const repository = new Repository(user, repo);
 
         if (!msg.from)
             throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
 
-        const tokenName = yield client.hgetAsync('user_to_token_map', user);
-        if (!tokenName)
-            throw { messageFromBot: 'Token for your repo is not found.' };
-
-        const token = yield client.hgetAsync('tokens', tokenName);
+        const token = yield this._redisDal.getGithubToken(repository);
         const pr = yield this._gitHubClient.GetPullRequestState(user, repo, id, token);
         yield [
             client.hmsetAsync(`${user}/${repo}/${id}`, {
@@ -300,14 +301,14 @@ class Bot {
     }
 
     * sendFarewell(reason) {
-        if (telegramConfig.sendFarewells)
+        if (this._telegramConfig.sendFarewells)
             yield this._sendToMultipleChats(`Bot exited. Reason: ${reason}`, this._acl.su);
     }
 
     * sendGreetings() {
-        if (telegramConfig.sendGreetings)
+        if (this._telegramConfig.sendGreetings)
             yield this._sendToMultipleChats("Bot started.", this._acl.su);
     }
 }
 
-module.exports = Bot;
+module.exports = Bot

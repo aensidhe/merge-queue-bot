@@ -36,7 +36,7 @@ class GitHubClient {
     _makeGithubRequest(token, request) {
         let client = this._getAuthenticatedClient(token);
         return new Promise(function(resolve, reject) {
-            request(client, function(err, result) { 
+            request(client, function(err, result) {
                 this._promiseFullFiller(err, result, resolve, reject);
             });
         });
