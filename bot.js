@@ -18,46 +18,46 @@ class Bot {
 
         this._bot.onText(
             new RegExp(`/add ${githubPattern}`), 
-            (msg, args) => this._handle(this.onAddPullRequest, msg, args));
+            (msg, args) => this._handle(this.onAddPullRequest.bind(this), msg, args));
 
         this._bot.onText(
             new RegExp(`/remove ${githubPattern}`), 
-            (msg, args) => this._handle(this.onRemovePullRequest, msg, args));
+            (msg, args) => this._handle(this.onRemovePullRequest.bind(this), msg, args));
 
         this._bot.onText(
             /\/queue/, 
-            (msg, args) => this._handle(this.onQueueRequestHandler, msg, args));
+            (msg, args) => this._handle(this.onQueueRequestHandler.bind(this), msg, args));
 
         this._bot.onText(
             /\/add_token (\S+) (\S+)/, 
-            (msg, args) => this._handle(this.onAddTokenHandler, msg, args, {
+            (msg, args) => this._handle(this.onAddTokenHandler.bind(this), msg, args, {
                 adminOnly: true,
                 privateOnly: true
             }));
 
         this._bot.onText(
             /\/remove_token (\S+)/, 
-            (msg, args) => this._handle(this.onRemoveTokenHandler, msg, args, {
+            (msg, args) => this._handle(this.onRemoveTokenHandler.bind(this), msg, args, {
                 adminOnly: true,
                 privateOnly: true
             }));
 
         this._bot.onText(
             /\/map_token (\S+) (\S+)/, 
-            (msg, args) => this._handle(this.onMapTokenHandler, msg, args, {
+            (msg, args) => this._handle(this.onMapTokenHandler.bind(this), msg, args, {
                 adminOnly: true,
                 privateOnly: true
             }));
 
         this._bot.onText(
             /\/bind (\S+) (\S+)/, 
-            (msg, args) => this._handle(this.onBindRepoToChat, msg, args, {
+            (msg, args) => this._handle(this.onBindRepoToChat.bind(this), msg, args, {
                 adminOnly: true
             }));
 
         this._bot.onText(
             /\/unbind (\S+) (\S+)/,
-            (msg, args) => this._handle(this.onUnbindRepoToChat, msg, args, {
+            (msg, args) => this._handle(this.onUnbindRepoToChat.bind(this), msg, args, {
                 adminOnly: true
             }));
 
