@@ -19,45 +19,18 @@ class GitHubClient {
         return github;
     }
 
-    _promiseFullFiller(err, result, resolve, reject) {
-        if (!err) {
-            resolve(result);
-        }
-
-        if (err.Code == "404")
-        {
-            reject({ messageFromBot: "Pull request not found" });
-            return;
-        }
-
-        throw (err);
-    }
-
-    * _makeGithubRequest(token, request) {
-        let client = this._getAuthenticatedClient(token);
-        yield new Promise((resolve, reject) => {
-            request(client, (err, result) => {
-                this._promiseFullFiller(err, result, resolve, reject).bind(this);
-            });
-        });
-    }
-
     * GetPullRequest(repository, id, token) {
-        yield this._makeGithubRequest(token, function (github, callback) {
-            github.pullRequests.get(
-            {
-                owner: repository.owner,
-                repo: repository.name,
-                number: id
-            },
-            callback);
+        const github = this._getAuthenticatedClient(token);
+        let pr = yield github.pullRequests.get({
+            owner: repository.owner,
+            repo: repository.name,
+            number: id
         });
+        console.log(`Got PR ${id} url: ${pr.html_url} and ${pr.head.sha}`);
+        return pr;
     }
 
-    SetCommitStatus(user, repo, id, status, token) {
-        return makeGithubRequest(token, function (github, callback) {
-
-        })
+    * SetCommitStatus(user, repo, id, status, token) {
     }
 }
 
