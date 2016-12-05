@@ -1,6 +1,8 @@
 const co = require('co');
 const TelegramBot = require('node-telegram-bot-api');
+
 const Repository = require('./Repository.js')
+const TelegramUser = require('./TelegramUser.js')
 
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
@@ -78,11 +80,9 @@ class Bot {
         return false;
     }
 
-
-    * _sendMessageToAllRepoChats(user, repo, message) {
-        const repository = new Repository(user, repo);
+    * _sendMessageToAllRepoChats(repository, message) {
         let chats = new Set(yield this._redisDal.getAllChatsForRepo(repository));
-        for (var i = 3; i < arguments.length; i++) {
+        for (var i = 2; i < arguments.length; i++) {
             if (arguments[i] != undefined && arguments[i] != null)
                 chats.add(arguments[i].toString());
         }
@@ -167,8 +167,7 @@ class Bot {
         ];
 
         yield this._sendMessageToAllRepoChats(
-            user,
-            repo,
+            repository,
             `PR [#${id}](${pr.html_url}) is added to queue by ${new TelegramUser(msg.from.userid, msg.from.username, msg.from.first_name, msg.from.last_name).getMention()}`,
             msg.chat.id);
     }
@@ -177,6 +176,7 @@ class Bot {
         const user = args[1];
         const repo = args[2];
         const id = args[3];
+        const repository = new Repository(user, repo);
 
         const prData = yield client.hgetallAsync(`${user}/${repo}/${id}`);
         if (!prData)
@@ -188,8 +188,7 @@ class Bot {
         ];
 
         yield this._sendMessageToAllRepoChats(
-            user,
-            repo,
+            repository,
             `PR [#${id}](${prData.url}) is removed from queue by ${new TelegramUser(msg.from.userid, msg.from.username, msg.from.first_name, msg.from.last_name).getMention()}`,
             msg.chat.id,
             prData.userid);
@@ -199,15 +198,13 @@ class Bot {
 
         if (next_pr)
             yield this._sendMessageToAllRepoChats(
-                user,
-                repo,
+                repository,
                 `PR [#${next_pr.id}](${next_pr.url}) by ${new TelegramUser(next_pr.userid, next_pr.username, next_pr.first_name, next_pr.last_name).getMention()} is next in queue!`,
                 msg.chat.id,
                 next_pr.userid);
         else
             yield this._sendMessageToAllRepoChats(
-                user,
-                repo,
+                repository,
                 'Queue is empty!',
                 msg.chat.id);
     }
