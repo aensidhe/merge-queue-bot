@@ -1,8 +1,9 @@
 const co = require('co');
 const TelegramBot = require('node-telegram-bot-api');
 
-const Repository = require('./Repository.js')
-const TelegramUser = require('./TelegramUser.js')
+const Repository = require('./Repository.js');
+const TelegramUser = require('./TelegramUser.js');
+const PullRequest = require('./PullRequest.js');
 
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
@@ -91,22 +92,40 @@ class Bot {
     }
 
     * _reportQueueToChat(repo, chatId) {
-        const queue = yield client.zrangebyscoreAsync(`${repo}/queue`, '-inf', '+inf');
+        const queue = yield this._redisDal.getRepositoryQueue(repo);
         if (!queue || queue.length == 0)
         {
-            yield this._bot.sendMessage(chatId, `Queue for ${repo} is empty`, { parse_mode: 'Markdown' });
+            yield this._bot.sendMessage(
+                chatId,
+                `Queue for ${repo.user}/${repo.name} is empty`,
+                { parse_mode: 'Markdown' });
             return;
         }
 
         let prGetters = [];
         queue.forEach(prId => {
-            prGetters.push(client.hgetallAsync(`${repo}/${prId}`));
+            prGetters.push(this._redisDal.getPullRequest(repo, prId));
         });
         const prs = yield prGetters;
-        let message = `Queue for ${repo}\n`;
-        prs.forEach(pr => message += `- [#${pr.id}](${pr.url}) by ${new TelegramUser(pr.userid, pr.username, pr.first_name, pr.last_name).getMention()}\n`);
+        let message = `Queue for ${repo.user}/${repo.name}\n`;
+        prs.forEach(pr => message += `- [#${pr.id}](${pr.url}) by ${pr.reporter.getMention()}\n`);
 
         yield this._bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    }
+
+    * generalErrorHandler(reason, currentChatId) {
+        if (reason.messageFromBot) {
+            console.log(reason.messageFromBot);
+            yield this._bot.sendMessage(
+                currentChatId,
+                reason.messageFromBot);
+        }
+
+        console.error(reason);
+    }
+
+    _handleError(e, chatId) {
+        return co(this.generalErrorHandler.bind(this), e, chatId);
     }
 
     _handle(handler, msg, args, options) {
@@ -125,10 +144,11 @@ class Bot {
         }
 
         try {
-            co(handler(msg, args));
+            return co(handler, msg, args)
+                .catch(e => this._handleError(e, msg.chat.Id));
         }
         catch(e) {
-            co(this.generalErrorHandler(e, msg.chat.id));
+            return this._handleError(e, msg.chat.Id);
         }
     }
 
@@ -144,62 +164,59 @@ class Bot {
     }
 
     * onAddPullRequest(msg, args) {
-        const user = args[1];
-        const repo = args[2];
-        const id = args[3];
-        const repository = new Repository(user, repo);
+        const repository = new Repository(args[1], args[2]);
+        const id = Number(args[3]);
 
         if (!msg.from)
             throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
 
         const token = yield this._redisDal.getGithubToken(repository);
-        const pr = yield this._gitHubClient.GetPullRequestState(user, repo, id, token);
+        const githubPr = yield this._gitHubClient.GetPullRequest(repository, id, token);
+
+        const pr = new PullRequest(
+            repository,
+            id,
+            new TelegramUser(msg.from.userid, msg.from.username, msg.from.first_name, msg.from.last_name),
+            new Date().getTime(),
+            githubPr.html_url,
+            githubPr.head.sha);
+
         yield [
-            client.hmsetAsync(`${user}/${repo}/${id}`, {
-                userid: msg.from.id,
-                username: msg.from.username,
-                first_name: msg.from.first_name,
-                last_name: msg.from.last_name,
-                url: pr.html_url,
-                id
-            }),
-            client.zaddAsync(`${user}/${repo}/queue`, new Date().getTime(), id)
+            this._redisDal.savePullRequest(pr),
+            this._redisDal.addPullRequestToQueue(pr)
         ];
 
         yield this._sendMessageToAllRepoChats(
             repository,
-            `PR [#${id}](${pr.html_url}) is added to queue by ${new TelegramUser(msg.from.userid, msg.from.username, msg.from.first_name, msg.from.last_name).getMention()}`,
+            `PR [#${pr.id}](${pr.url}) is added to queue by ${pr.reporter.getMention()}`,
             msg.chat.id);
     }
 
     * onRemovePullRequest(msg, args) {
-        const user = args[1];
-        const repo = args[2];
-        const id = args[3];
-        const repository = new Repository(user, repo);
+        const repository = new Repository(args[1], args[2]);
+        const id = Number(args[3]);
 
-        const prData = yield client.hgetallAsync(`${user}/${repo}/${id}`);
-        if (!prData)
+        const pr = yield this._redisDal.getPullRequest(repository, id);
+        if (!pr)
             throw { messageFromBot: 'PR not found' };
 
         yield [
-            client.delAsync(`${user}/${repo}/${id}`),
-            client.zremAsync(`${user}/${repo}/queue`, id)
+            this._redisDal.deletePullRequest(repository, id),
+            this._redisDal.removePullRequestFromQueue(repository, id)
         ];
 
         yield this._sendMessageToAllRepoChats(
             repository,
-            `PR [#${id}](${prData.url}) is removed from queue by ${new TelegramUser(msg.from.userid, msg.from.username, msg.from.first_name, msg.from.last_name).getMention()}`,
+            `PR [#${pr.id}](${pr.url}) is removed from queue by ${pr.reporter.getMention()}`,
             msg.chat.id,
-            prData.userid);
+            pr.reporter.id);
 
-        const next = yield client.zrangebyscoreAsync([`${user}/${repo}/queue`, '-inf', '+inf', 'LIMIT', '0', '1']);
-        const next_pr = yield client.hgetallAsync(`${user}/${repo}/${next}`);
+        const next_pr = yield this._redisDal.getNextPullRequestFromQueue(repository);
 
         if (next_pr)
             yield this._sendMessageToAllRepoChats(
                 repository,
-                `PR [#${next_pr.id}](${next_pr.url}) by ${new TelegramUser(next_pr.userid, next_pr.username, next_pr.first_name, next_pr.last_name).getMention()} is next in queue!`,
+                `PR [#${next_pr.id}](${next_pr.url}) by ${next_pr.reporter.getMention()} is next in queue!`,
                 msg.chat.id,
                 next_pr.userid);
         else
@@ -271,17 +288,6 @@ class Bot {
         yield this._bot.sendMessage(
             msg.chat.id,
             `This chat has been unmapped from merge queue of ${user}/${repo}`);
-    }
-
-    * generalErrorHandler(reason, currentChatId) {
-        if (reason.messageFromBot) {
-            console.log(reason.messageFromBot);
-            yield this._bot.sendMessage(
-                currentChatId,
-                reason.messageFromBot);
-        }
-
-        console.error(reason);
     }
 
     * sendFarewell(reason) {

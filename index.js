@@ -20,10 +20,10 @@ function* onStartup() {
     yield bot.sendGreetings();
 }
 
-process.on('SIGTERM', () => co(onSigTerm('SIGTERM')));
-process.on('SIGINT', () => co(onSigTerm('SIGINT')));
-process.on('exit', () => co(onSigTerm('exit')));
-process.on('uncaughtException', () => co(onSigTerm('uncaughtException')));
+process.on('SIGTERM', () => co(onSigTerm, 'SIGTERM'));
+process.on('SIGINT', () => co(onSigTerm, 'SIGINT'));
+process.on('exit', () => co(onSigTerm, 'exit'));
+process.on('uncaughtException', () => co(onSigTerm, 'uncaughtException'));
 
 co(onStartup);
 

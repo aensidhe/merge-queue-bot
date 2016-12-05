@@ -30,24 +30,24 @@ class GitHubClient {
             return;
         }
 
-        reject(err);
+        throw (err);
     }
 
-    _makeGithubRequest(token, request) {
+    * _makeGithubRequest(token, request) {
         let client = this._getAuthenticatedClient(token);
-        return new Promise(function(resolve, reject) {
-            request(client, function(err, result) {
-                this._promiseFullFiller(err, result, resolve, reject);
+        yield new Promise((resolve, reject) => {
+            request(client, (err, result) => {
+                this._promiseFullFiller(err, result, resolve, reject).bind(this);
             });
         });
     }
 
-    GetPullRequestState(user, repo, id, token) {
-        return this._makeGithubRequest(token, function (github, callback) {
+    * GetPullRequest(repository, id, token) {
+        yield this._makeGithubRequest(token, function (github, callback) {
             github.pullRequests.get(
             {
-                user: user,
-                repo: repo,
+                owner: repository.owner,
+                repo: repository.name,
                 number: id
             },
             callback);
