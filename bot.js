@@ -78,19 +78,6 @@ class Bot {
         return false;
     }
 
-    _getUserMention(user) {
-        if (user.username)
-            return `@${user.username}`;
-
-        let result = nil;
-        if (user.last_name)
-            result = user.last_name;
-
-        if (user.first_name)
-            result = result ? `${user.first_name} {result} ` : user.first_name;
-
-        return result ? result : user.id.toString();
-    }
 
     * _sendMessageToAllRepoChats(user, repo, message) {
         const repository = new Repository(user, repo);
@@ -117,7 +104,7 @@ class Bot {
         });
         const prs = yield prGetters;
         let message = `Queue for ${repo}\n`;
-        prs.forEach(pr => message += `- [#${pr.id}](${pr.url}) by ${this._getUserMention(pr)}\n`);
+        prs.forEach(pr => message += `- [#${pr.id}](${pr.url}) by ${new TelegramUser(pr.userid, pr.username, pr.first_name, pr.last_name).getMention()}\n`);
 
         yield this._bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     }
@@ -182,7 +169,7 @@ class Bot {
         yield this._sendMessageToAllRepoChats(
             user,
             repo,
-            `PR [#${id}](${pr.html_url}) is added to queue by ${this._getUserMention(msg.from)}`,
+            `PR [#${id}](${pr.html_url}) is added to queue by ${new TelegramUser(msg.from.userid, msg.from.username, msg.from.first_name, msg.from.last_name).getMention()}`,
             msg.chat.id);
     }
 
@@ -203,7 +190,7 @@ class Bot {
         yield this._sendMessageToAllRepoChats(
             user,
             repo,
-            `PR [#${id}](${prData.url}) is removed from queue by ${this._getUserMention(msg.from)}`,
+            `PR [#${id}](${prData.url}) is removed from queue by ${new TelegramUser(msg.from.userid, msg.from.username, msg.from.first_name, msg.from.last_name).getMention()}`,
             msg.chat.id,
             prData.userid);
 
@@ -214,7 +201,7 @@ class Bot {
             yield this._sendMessageToAllRepoChats(
                 user,
                 repo,
-                `PR [#${next_pr.id}](${next_pr.url}) by ${this._getUserMention(next_pr)} is next in queue!`,
+                `PR [#${next_pr.id}](${next_pr.url}) by ${new TelegramUser(next_pr.userid, next_pr.username, next_pr.first_name, next_pr.last_name).getMention()} is next in queue!`,
                 msg.chat.id,
                 next_pr.userid);
         else
