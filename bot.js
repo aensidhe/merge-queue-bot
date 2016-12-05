@@ -17,40 +17,40 @@ class Bot {
         this._bot = new TelegramBot(telegramConfig.token, {polling: true});
 
         this._bot.onText(
-            new RegExp(`/add ${githubPattern}`), 
+            new RegExp(`/add ${githubPattern}`),
             (msg, args) => this._handle(this.onAddPullRequest.bind(this), msg, args));
 
         this._bot.onText(
-            new RegExp(`/remove ${githubPattern}`), 
+            new RegExp(`/remove ${githubPattern}`),
             (msg, args) => this._handle(this.onRemovePullRequest.bind(this), msg, args));
 
         this._bot.onText(
-            /\/queue/, 
+            /\/queue/,
             (msg, args) => this._handle(this.onQueueRequestHandler.bind(this), msg, args));
 
         this._bot.onText(
-            /\/add_token (\S+) (\S+)/, 
+            /\/add_token (\S+) (\S+)/,
             (msg, args) => this._handle(this.onAddTokenHandler.bind(this), msg, args, {
                 adminOnly: true,
                 privateOnly: true
             }));
 
         this._bot.onText(
-            /\/remove_token (\S+)/, 
+            /\/remove_token (\S+)/,
             (msg, args) => this._handle(this.onRemoveTokenHandler.bind(this), msg, args, {
                 adminOnly: true,
                 privateOnly: true
             }));
 
         this._bot.onText(
-            /\/map_token (\S+) (\S+)/, 
+            /\/map_token (\S+) (\S+)/,
             (msg, args) => this._handle(this.onMapTokenHandler.bind(this), msg, args, {
                 adminOnly: true,
                 privateOnly: true
             }));
 
         this._bot.onText(
-            /\/bind (\S+) (\S+)/, 
+            /\/bind (\S+) (\S+)/,
             (msg, args) => this._handle(this.onBindRepoToChat.bind(this), msg, args, {
                 adminOnly: true
             }));
@@ -62,7 +62,7 @@ class Bot {
             }));
 
         this._bot.onText(
-            /\/ping/, 
+            /\/ping/,
             (msg) => this._bot.sendMessage(msg.chat.id, 'pong'));
     }
 
@@ -120,6 +120,7 @@ class Bot {
 
     _handle(handler, msg, args, options) {
         options = options || {};
+        console.log(`Received message: ${JSON.stringify(msg)}`)
         if (options.adminOnly && !this._hasAdminAccess(msg))
             return;
 
