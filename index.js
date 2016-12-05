@@ -11,8 +11,8 @@ const bot = new Bot(
     new RedisDal(config.get('redis')),
     config.get('telegram'));
 
-function* onSigTerm(reason) {
-    yield bot.sendFarewell(reason);
+function* onSigTerm(reason, e) {
+    yield bot.sendFarewell(e ? `${reason}: ${e}` : reason);
     process.exit(0);
 }
 
@@ -23,7 +23,7 @@ function* onStartup() {
 process.on('SIGTERM', () => co(onSigTerm, 'SIGTERM'));
 process.on('SIGINT', () => co(onSigTerm, 'SIGINT'));
 process.on('exit', () => co(onSigTerm, 'exit'));
-process.on('uncaughtException', () => co(onSigTerm, 'uncaughtException'));
+process.on('uncaughtException', e => co(onSigTerm, 'uncaughtException', e));
 
 co(onStartup);
 

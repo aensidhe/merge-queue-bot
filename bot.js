@@ -176,7 +176,7 @@ class Bot {
         const pr = new PullRequest(
             repository,
             id,
-            new TelegramUser(msg.from.userid, msg.from.username, msg.from.first_name, msg.from.last_name),
+            new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name),
             new Date().getTime(),
             githubPr.html_url,
             githubPr.head.sha);
@@ -201,8 +201,8 @@ class Bot {
             throw { messageFromBot: 'PR not found' };
 
         yield [
-            this._redisDal.deletePullRequest(repository, id),
-            this._redisDal.removePullRequestFromQueue(repository, id)
+            this._redisDal.deletePullRequest(pr),
+            this._redisDal.removePullRequestFromQueue(pr)
         ];
 
         yield this._sendMessageToAllRepoChats(

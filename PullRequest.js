@@ -19,7 +19,7 @@ class PullRequest {
     get reportedTime() { return this._reportedTime; }
 
     toHash(hash, prefix) {
-        const actualPrefix = _getPrefix(prefix);
+        const actualPrefix = PullRequest._getPrefix(prefix);
         let result = hash || {};
 
         result[`${actualPrefix}.id`] = this._id;
@@ -46,7 +46,7 @@ class PullRequest {
             return null;
         }
 
-        const actualPrefix = _getPrefix(prefix);
+        const actualPrefix = PullRequest._getPrefix(prefix);
 
         const id = hash['pullRequest.id'];
         const url = hash['pullRequest.url'];
@@ -57,8 +57,8 @@ class PullRequest {
             return null;
         }
 
-        const repository = Repository.fromHash(hash, `${actualPrefix}.reporter`);
-        const reporter = TelegramUser.fromHash(hash, `${actualPrefix}.repository`);
+        const repository = Repository.fromHash(hash, `${actualPrefix}.repository`);
+        const reporter = TelegramUser.fromHash(hash, `${actualPrefix}.reporter`);
 
         return new PullRequest(
             repository,

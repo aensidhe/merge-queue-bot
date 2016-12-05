@@ -8,7 +8,7 @@ class Repository {
     get name() { return this._name; }
 
     toHash(hash, prefix) {
-        const actualPrefix = _getPrefix(prefix);
+        const actualPrefix = Repository._getPrefix(prefix);
         let result = hash || {}
 
         result[`${actualPrefix}.owner`] = this._owner;
@@ -26,7 +26,7 @@ class Repository {
             return null;
         }
 
-        const actualPrefix = _getPrefix(prefix);
+        const actualPrefix = Repository._getPrefix(prefix);
 
         const owner = hash[`${actualPrefix}.owner`];
         const name = hash[`${actualPrefix}.name`];

@@ -26,13 +26,16 @@ class TelegramUser {
     }
 
     toHash(hash, prefix) {
-        const actualPrefix = _getPrefix(prefix);
+        const actualPrefix = TelegramUser._getPrefix(prefix);
         let result = hash || {}
 
         result[`${actualPrefix}.id`] = this._id;
-        result[`${actualPrefix}.username`] = this._username;
         result[`${actualPrefix}.firstName`] = this._firstName;
-        result[`${actualPrefix}.lastName`] = this._lastName;
+
+        if (this._username)
+            result[`${actualPrefix}.username`] = this._username;
+        if (this._lastName)
+            result[`${actualPrefix}.lastName`] = this._lastName;
 
         return result;
     }
@@ -46,16 +49,16 @@ class TelegramUser {
             return null;
         }
 
-        const actualPrefix = _getPrefix(prefix);
+        const actualPrefix = TelegramUser._getPrefix(prefix);
 
         const id = hash[`${actualPrefix}.id`];
         if (!id) {
             return null;
         }
 
-        username = hash[`${actualPrefix}.username`];
-        firstName = hash[`${actualPrefix}.firstName`];
-        lastName = hash[`${actualPrefix}.lastName`]
+        const username = hash[`${actualPrefix}.username`];
+        const firstName = hash[`${actualPrefix}.firstName`];
+        const lastName = hash[`${actualPrefix}.lastName`]
 
         return new TelegramUser(Number(id), username, firstName, lastName);
     }

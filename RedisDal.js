@@ -29,24 +29,24 @@ class RedisDal {
     }
 
     * getRepositoryQueue(repository) {
-        yield this._client.zrangebyscoreAsync(_getQueueKey(repository), '-inf', '+inf');
+        yield this._client.zrangebyscoreAsync(this._getQueueKey(repository), '-inf', '+inf');
     }
 
     * addPullRequestToQueue(pullRequest) {
         yield this._client.zaddAsync(
-            _getQueueKey(pullRequest.repository),
-            pullRequest.id,
-            pullRequest.reportedTime);
+            this._getQueueKey(pullRequest.repository),
+            pullRequest.reportedTime,
+            pullRequest.id);
     }
 
     * removePullRequestFromQueue(pullRequest) {
         yield this._client.zremAsync(
-            _getQueueKey(pullRequest.repository),
+            this._getQueueKey(pullRequest.repository),
             pullRequest.id);
     }
 
     * getNextPullRequestFromQueue(repository) {
-        const nextId = yield this._client.zrangebyscoreAsync([_getQueueKey(repository), '-inf', '+inf', 'LIMIT', '0', '1']);
+        const nextId = yield this._client.zrangebyscoreAsync([this._getQueueKey(repository), '-inf', '+inf', 'LIMIT', '0', '1']);
         if (!nextId) {
             return null;
         }
@@ -65,11 +65,12 @@ class RedisDal {
 
     * getPullRequest(repository, id) {
         const hash = yield this._client.hgetallAsync(this._getPullRequestKey(repository, id));
+        console.dir(hash);
         return PullRequest.fromHash(hash);
     }
 
-    * deletePullRequest(repository, id) {
-        yield this._client.delAsync(this._getPullRequestKey(repository, id));
+    * deletePullRequest(pullRequest) {
+        yield this._client.delAsync(this._getPullRequestKey(pullRequest.repository, pullRequest.id));
     }
 }
 
