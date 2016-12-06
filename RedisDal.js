@@ -1,6 +1,7 @@
 const Repository = require('./Repository.js');
 const TelegramUser = require('./TelegramUser.js');
 const PullRequest = require('./PullRequest.js');
+const Token = require('./Token.js');
 
 const redis = require('redis');
 const P = require('bluebird');
@@ -12,10 +13,6 @@ class RedisDal {
         this._client = redis.createClient(redisConfig);
     }
 
-    * getAllChatsForRepo(repository) {
-        yield this._client.smembersAsync(`repo_chats:${repository.owner}/${repository.name}`);
-    }
-
     * getGithubToken(repository) {
         const tokenName = yield this._client.hgetAsync('user_to_token_map', repository.owner);
         if (!tokenName)
@@ -25,11 +22,11 @@ class RedisDal {
     }
 
     _getQueueKey(repository) {
-        return `${repository.owner}/${repository.name}/queue`;
+        return `${repository}/queue`;
     }
 
     * getRepositoryQueue(repository) {
-        yield this._client.zrangebyscoreAsync(this._getQueueKey(repository), '-inf', '+inf');
+        return yield this._client.zrangebyscoreAsync(this._getQueueKey(repository), '-inf', '+inf');
     }
 
     * addPullRequestToQueue(pullRequest) {
@@ -54,7 +51,7 @@ class RedisDal {
     }
 
     _getPullRequestKey(repository, id) {
-        return `${repository.owner}/${repository.name}/${id}`;
+        return `${repository}/${id}`;
     }
 
     * savePullRequest(pullRequest) {
@@ -70,6 +67,47 @@ class RedisDal {
 
     * deletePullRequest(pullRequest) {
         yield this._client.delAsync(this._getPullRequestKey(pullRequest.repository, pullRequest.id));
+    }
+
+    * saveToken(token) {
+        yield this._client.hsetAsync('tokens', token.name, token.token);
+    }
+
+    * deleteToken(name) {
+        yield this._client.hdelAsync('tokens', name);
+    }
+
+    * getToken(name) {
+        return new Token(name, yield this._client.hgetAsync('tokens', name));
+    }
+
+    * saveTokenMapping(name, owner) {
+        yield this._client.hsetAsync('user_to_token_map', owner, name);
+    }
+
+    * saveChatBinding(chatId, repository) {
+        yield [
+            this._client.saddAsync(`repo_chats:${chatId}`, `${repository}`),
+            this._client.saddAsync(`repo_chats:${repository}`, chatId)
+        ];
+    }
+
+    * removeChatBinding(chatId, repository) {
+        yield [
+            this._client.sremAsync(`repo_chats:${chatId}`, `${repository}`),
+            this._client.sremAsync(`repo_chats:${repository}`, chatId)
+        ];
+    }
+
+    * getBindedRepositories(chatId) {
+        const repos = yield this._client.smembersAsync(`repo_chats:${chatId}`);
+        let result = [];
+        repos.forEach(x => result.push(Repository.parse(x)));
+        return result;
+    }
+
+    * getBindedChats(repository) {
+        yield this._client.smembersAsync(`repo_chats:${repository}`);
     }
 }
 

@@ -4,15 +4,11 @@ const TelegramBot = require('node-telegram-bot-api');
 const Repository = require('./Repository.js');
 const TelegramUser = require('./TelegramUser.js');
 const PullRequest = require('./PullRequest.js');
+const Token = require('./Token.js');
+
+const RedisDal = require('./RedisDal.js');
 
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
-
-const config = require('config');
-const redisConfig = config.get('redis');
-const redis = require('redis');
-const P = require('bluebird');
-P.promisifyAll(redis.RedisClient.prototype);
-const client = redis.createClient(redisConfig);
 
 class Bot {
     constructor(gitHubClient, acl, redisDal, telegramConfig) {
@@ -82,7 +78,7 @@ class Bot {
     }
 
     * _sendMessageToAllRepoChats(repository, message) {
-        let chats = new Set(yield this._redisDal.getAllChatsForRepo(repository));
+        let chats = new Set(yield this._redisDal.getBindedChats(repository));
         for (var i = 2; i < arguments.length; i++) {
             if (arguments[i] != undefined && arguments[i] != null)
                 chats.add(arguments[i].toString());
@@ -91,23 +87,23 @@ class Bot {
         yield this._sendToMultipleChats(message, chats);
     }
 
-    * _reportQueueToChat(repo, chatId) {
-        const queue = yield this._redisDal.getRepositoryQueue(repo);
+    * _reportQueueToChat(repository, chatId) {
+        const queue = yield this._redisDal.getRepositoryQueue(repository);
         if (!queue || queue.length == 0)
         {
             yield this._bot.sendMessage(
                 chatId,
-                `Queue for ${repo.user}/${repo.name} is empty`,
+                `Queue for ${repository} is empty`,
                 { parse_mode: 'Markdown' });
             return;
         }
 
         let prGetters = [];
         queue.forEach(prId => {
-            prGetters.push(this._redisDal.getPullRequest(repo, prId));
+            prGetters.push(this._redisDal.getPullRequest(repository, prId));
         });
         const prs = yield prGetters;
-        let message = `Queue for ${repo.user}/${repo.name}\n`;
+        let message = `Queue for ${repository}\n`;
         prs.forEach(pr => message += `- [#${pr.id}](${pr.url}) by ${pr.reporter.getMention()}\n`);
 
         yield this._bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
@@ -227,7 +223,7 @@ class Bot {
     }
 
     * onQueueRequestHandler(msg, args) {
-        let repositoriesToReport = yield client.smembersAsync(`repo_chats:${msg.chat.id.toString()}`);
+        let repositoriesToReport = yield this._redisDal.getBindedRepositories(msg.chat.id);
         let reports = [];
         repositoriesToReport.forEach(repo => {
             reports.push(this._reportQueueToChat(repo, msg.chat.id));
@@ -237,9 +233,7 @@ class Bot {
     }
 
     * onAddTokenHandler(msg, args) {
-        const name = args[1];
-        const token = args[2];
-        yield client.hsetAsync('tokens', name, token);
+        yield this._redisDal.saveToken(new Token(args[1], args[2]));
         yield this._bot.sendMessage(
             msg.chat.id,
             `Token ${name} saved successfully.`);
@@ -247,47 +241,39 @@ class Bot {
 
     * onRemoveTokenHandler(msg, args) {
         const name = args[1];
-        yield client.hdelAsync('tokens', name);
+        yield this._redisDal.deleteToken(name);
         yield this._bot.sendMessage(
             msg.chat.id,
             `Token ${name} deleted successfully.`);
     }
 
     * onMapTokenHandler(msg, args) {
-        const user = args[1];
-        const token = args[2];
-        yield client.hsetAsync('user_to_token_map', user, token);
+        const owner = args[1];
+        const name = args[2];
+        yield this._redisDal.mapTokenToOwner(name, owner);
         yield this._bot.sendMessage(
             msg.chat.id,
-            `Token ${token} will be used as an access to ${user}`);
+            `Token ${name} will be used as an access to ${owner}`);
     }
 
     * onBindRepoToChat(msg, args) {
-        const user = args[1];
-        const repo = args[2];
+        const repository = new Repository(args[1], args[2]);
 
-        yield [
-            client.saddAsync(`repo_chats:${msg.chat.id.toString()}`, `${user}/${repo}`),
-            client.saddAsync(`repo_chats:${user}/${repo}`, msg.chat.id)
-        ];
+        yield this._redisDal.saveChatBinding(msg.chat.id, repository);
 
         yield this._bot.sendMessage(
             msg.chat.id,
-            `This chat has been mapped to merge queue of ${user}/${repo}`);
+            `This chat has been mapped to merge queue of ${repository}`);
     }
 
     * onUnbindRepoToChat(msg, args) {
-        const user = args[1];
-        const repo = args[2];
+        const repository = new Repository(args[1], args[2]);
 
-        yield [
-            client.sremAsync(`repo_chats:${msg.chat.id.toString()}`, `${user}/${repo}`),
-            client.sremAsync(`repo_chats:${user}/${repo}`, msg.chat.id)
-        ];
+        yield this._redisDal.removeChatBinding(msg.chat.id, repository);
 
         yield this._bot.sendMessage(
             msg.chat.id,
-            `This chat has been unmapped from merge queue of ${user}/${repo}`);
+            `This chat has been unmapped from merge queue of ${repository}`);
     }
 
     * sendFarewell(reason) {

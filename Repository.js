@@ -7,6 +7,27 @@ class Repository {
     get owner() { return this._owner; }
     get name() { return this._name; }
 
+    toString() {
+        return `${this._owner}/${this._name}`;
+    }
+
+    /**
+     * @param {string} s
+     */
+    static parse(s) {
+        if (!s) {
+            return null;
+        }
+
+        var parts = s.split('/');
+
+        if (parts.length != 2) {
+            throw new `Can't parse ${s} to repo`;
+        }
+
+        return new Repository(parts[0], parts[1]);
+    }
+
     toHash(hash, prefix) {
         const actualPrefix = Repository._getPrefix(prefix);
         let result = hash || {}
