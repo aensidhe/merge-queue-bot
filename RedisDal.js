@@ -65,7 +65,6 @@ class RedisDal {
 
     * getPullRequest(repository, id) {
         const hash = yield this._client.hgetallAsync(this._getPullRequestKey(repository, id));
-        console.dir(hash);
         return PullRequest.fromHash(hash);
     }
 
