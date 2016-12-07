@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "allowJs": true,
+        "target": "es6",
+        "alwaysStrict": true,
+        "pretty": true,
+        "strictNullChecks": true
+    },
+    "compileOnSave": true,
+    "typeAcquisition": {
+        "enable": true
+    }
+}

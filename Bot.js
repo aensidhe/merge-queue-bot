@@ -110,7 +110,7 @@ class Bot {
     }
 
     * generalErrorHandler(reason, currentChatId) {
-        if (reason.messageFromBot) {
+        if (reason.messageFromBot && currentChatId) {
             console.log(reason.messageFromBot);
             yield this._bot.sendMessage(
                 currentChatId,
@@ -120,7 +120,7 @@ class Bot {
         console.error(reason);
     }
 
-    _handleError(e, chatId) {
+    handleError(e, chatId) {
         return co(this.generalErrorHandler.bind(this), e, chatId);
     }
 
@@ -141,10 +141,10 @@ class Bot {
 
         try {
             return co(handler, msg, args)
-                .catch(e => this._handleError(e, msg.chat.id));
+                .catch(e => this.handleError(e, msg.chat.id));
         }
         catch(e) {
-            return this._handleError(e, msg.chat.Id);
+            return this.handleError(e, msg.chat.Id);
         }
     }
 
@@ -196,10 +196,7 @@ class Bot {
         if (!pr)
             throw { messageFromBot: 'PR not found' };
 
-        yield [
-            this._redisDal.deletePullRequest(pr),
-            this._redisDal.removePullRequestFromQueue(pr)
-        ];
+        yield this._redisDal.removePullRequestFromQueue(pr);
 
         yield this._sendMessageToAllRepoChats(
             repository,

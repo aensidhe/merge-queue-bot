@@ -1,17 +1,22 @@
 class TelegramUser {
-    constructor(id, username, firstName, lastName) {
+    private _id: number;
+    private _username: string;
+    private _firstName: string;
+    private _lastName: string;
+
+    constructor(id: number, username: string, firstName: string, lastName: string) {
         this._id = id;
         this._username = username;
         this._firstName = firstName;
         this._lastName = lastName;
     }
 
-    get id() { return this._id; }
-    get userName() { return this._username; }
-    get firstName() { return this._firstName; }
-    get lastName() { return this._lastName; }
+    get id() : number { return this._id; }
+    get userName() : string { return this._username; }
+    get firstName() : string { return this._firstName; }
+    get lastName() : string { return this._lastName; }
 
-    getMention() {
+    getMention() : string {
         if (this._username)
             return `@${this._username}`;
 
@@ -22,12 +27,12 @@ class TelegramUser {
         if (this._firstName)
             result = result ? `${this._firstName} {result}` : this._firstName;
 
-        return result ? result : this._id.toString();
+        return result ? result : this._id;
     }
 
-    toHash(hash, prefix) {
+    toHash(hash: Map<string, any>, prefix: string) : Map<string, any> {
         const actualPrefix = TelegramUser._getPrefix(prefix);
-        let result = hash || {}
+        let result = hash || new Map<string, any>();
 
         result[`${actualPrefix}.id`] = this._id;
         result[`${actualPrefix}.firstName`] = this._firstName;
@@ -40,11 +45,11 @@ class TelegramUser {
         return result;
     }
 
-    static _getPrefix(prefix) {
+    static _getPrefix(prefix: string) : string {
         return prefix || 'telegramUser';
     }
 
-    static fromHash(hash, prefix) {
+    static fromHash(hash: Map<string, any>, prefix: string) : TelegramUser|null {
         if (!hash) {
             return null;
         }
@@ -60,8 +65,6 @@ class TelegramUser {
         const firstName = hash[`${actualPrefix}.firstName`];
         const lastName = hash[`${actualPrefix}.lastName`]
 
-        return new TelegramUser(Number(id), username, firstName, lastName);
+        return new TelegramUser(id, username, firstName, lastName);
     }
 }
-
-module.exports = TelegramUser
