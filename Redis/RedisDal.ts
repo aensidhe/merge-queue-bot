@@ -1,5 +1,5 @@
 import { AsyncClient } from './AsyncClient'
-class RedisDal {
+export class RedisDal {
     private readonly _client : AsyncClient;
     constructor(redisConfig) {
         this._client = new AsyncClient(redisConfig);
@@ -17,8 +17,22 @@ class RedisDal {
         return `${repository}/queue`;
     }
 
-    async getRepositoryQueue(repository: Repository) {
-        return await this._client.zrangebyscore(this._getQueueKey(repository));
+    async getRepositoryQueue(repository: Repository) : Promise<PullRequest[]> {
+        let ids = await this._client.zrangebyscore<number>(this._getQueueKey(repository));
+        let promises = new Array<Promise<PullRequest|null>>();
+        for (let id of ids) {
+            promises.push(this.getPullRequest(repository, id));
+        }
+
+        let prs = await Promise.all(promises);
+        let result = new Array<PullRequest>();
+        for (let pr of prs) {
+            if (pr != null) {
+                result.push(pr);
+            }
+        }
+
+        return result;
     }
 
     async addPullRequestToQueue(pullRequest: PullRequest) {
@@ -78,23 +92,23 @@ class RedisDal {
     }
 
     async saveChatBinding(chatId: number, repository: Repository) {
-        await [
+        await Promise.all([
             this._client.sadd(`repo_chats:${chatId}`, `${repository}`),
             this._client.sadd(`repo_chats:${repository}`, chatId.toString())
-        ];
+        ]);
     }
 
     async removeChatBinding(chatId: number, repository: Repository) {
-        await [
+        await Promise.all([
             this._client.srem(`repo_chats:${chatId}`, `${repository}`),
             this._client.srem(`repo_chats:${repository}`, chatId.toString())
-        ];
+        ]);
     }
 
     async getBindedRepositories(chatId: number) {
-        const repos = await this._client.smembers(`repo_chats:${chatId}`);
+        const repos = await this._client.smembers<string>(`repo_chats:${chatId}`);
         let result = new Array<Repository>();
-        for (let x in repos) {
+        for (let x of repos) {
             let repo = Repository.parse(x);
             if (repo != null) {
                 result.push(repo);
@@ -103,7 +117,7 @@ class RedisDal {
         return result;
     }
 
-    async getBindedChats(repository: Repository) : Promise<number[]> {
-        return await this._client.smembers<number>(`repo_chats:${repository}`);
+    async getBindedChats(repository: Repository) {
+        return await this._client.smembers<string>(`repo_chats:${repository}`);
     }
 }

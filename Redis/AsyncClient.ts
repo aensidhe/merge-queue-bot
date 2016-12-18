@@ -33,9 +33,8 @@ export class AsyncClient {
 
     async hmset(name: string, fields: Map<string, any>) {
         let args = new Array<any>();
-        for (let x in fields) {
-            args.push(x);
-            args.push(fields[x]);
+        for (let x of fields) {
+            args.push(x[0], x[1])
         }
         return await AsyncClient.redisCall<void>(this._client.hmset, args);
     }
