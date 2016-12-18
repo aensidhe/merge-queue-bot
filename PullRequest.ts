@@ -15,7 +15,7 @@ class PullRequest {
     readonly url : string;
     readonly sha1 : string;
 
-    toHash(hash: Map<string, any>, prefix: string) : Map<string, any> {
+    toHash(hash: Map<string, any>, prefix?: string) : Map<string, any> {
         const actualPrefix = PullRequest._getPrefix(prefix);
         let result = hash || new Map<string, any>();
 
@@ -34,11 +34,11 @@ class PullRequest {
         return result;
     }
 
-    private static _getPrefix(prefix: string) : string {
+    private static _getPrefix(prefix?: string) : string {
         return prefix || 'pullRequest';
     }
 
-    static fromHash(hash: Map<string, any>, prefix: string) : PullRequest|null {
+    static fromHash(hash: Map<string, any>, prefix?: string) : PullRequest|null {
         if (!hash) {
             return null;
         }

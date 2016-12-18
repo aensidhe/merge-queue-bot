@@ -25,7 +25,7 @@ class TelegramUser {
         return result ? result : this.id;
     }
 
-    toHash(hash: Map<string, any>, prefix: string) : Map<string, any> {
+    toHash(hash: Map<string, any>, prefix?: string) : Map<string, any> {
         const actualPrefix = TelegramUser._getPrefix(prefix);
         let result = hash || new Map<string, any>();
 
@@ -40,11 +40,11 @@ class TelegramUser {
         return result;
     }
 
-    static _getPrefix(prefix: string) : string {
+    static _getPrefix(prefix?: string) : string {
         return prefix || 'telegramUser';
     }
 
-    static fromHash(hash: Map<string, any>, prefix: string) : TelegramUser|null {
+    static fromHash(hash: Map<string, any>, prefix?: string) : TelegramUser|null {
         if (!hash) {
             return null;
         }
