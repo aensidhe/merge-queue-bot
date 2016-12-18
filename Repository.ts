@@ -25,7 +25,7 @@ class Repository {
         return new Repository(parts[0], parts[1]);
     }
 
-    toHash(hash: Map<string, any>, prefix?: string) : Map<string, any> {
+    toHash(hash?: Map<string, any>, prefix?: string) : Map<string, any> {
         const actualPrefix = Repository._getPrefix(prefix);
         let result = hash || new Map<string, any>();
 

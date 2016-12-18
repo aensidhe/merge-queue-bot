@@ -15,7 +15,7 @@ class PullRequest {
     readonly url : string;
     readonly sha1 : string;
 
-    toHash(hash: Map<string, any>, prefix?: string) : Map<string, any> {
+    toHash(hash?: Map<string, any>, prefix?: string) : Map<string, any> {
         const actualPrefix = PullRequest._getPrefix(prefix);
         let result = hash || new Map<string, any>();
 
