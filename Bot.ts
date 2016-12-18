@@ -1,22 +1,19 @@
-const co = require('co');
-const TelegramBot = require('node-telegram-bot-api');
-
-const Repository = require('./Repository.js');
-const TelegramUser = require('./TelegramUser.js');
-const PullRequest = require('./PullRequest.js');
-const Token = require('./Token.js');
-
-const RedisDal = require('./RedisDal.js');
-
+import * as TelegramBot from 'node-telegram-bot-api'
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
 class Bot {
-    constructor(gitHubClient, acl, redisDal, telegramConfig) {
+    private readonly _acl : Map<string, string>;
+    private readonly _gitHubClient: GitHubClient;
+    private readonly _telegramConfig : Map<string, string>;
+    private readonly _redisDal : RedisDal;
+    private readonly _bot : TelegramBot
+
+    constructor(gitHubClient : GitHubClient, acl : Map<string, string>, redisDal : RedisDal, telegramConfig : Map<string, string>) {
         this._acl = acl;
         this._gitHubClient = gitHubClient;
         this._telegramConfig = telegramConfig;
         this._redisDal = redisDal;
-        this._bot = new TelegramBot(this._telegramConfig.token, {polling: true});
+        this._bot = new TelegramBot(this._telegramConfig['token'], {polling: true});
 
         this._bot.onText(
             new RegExp(`/add ${githubPattern}`),

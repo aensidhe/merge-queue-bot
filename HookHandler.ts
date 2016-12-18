@@ -1,8 +1,6 @@
-const express = require('express');
-const compression = require('compression');
-const bodyParser = require('body-parser');
-
-const co = require('co');
+import * as express from "express";
+import * as compression from "compression";
+import * as bodyParser from "body-parser";
 
 class HookHandler {
     constructor(config, bot) {
@@ -12,7 +10,7 @@ class HookHandler {
 
         app.get('/', (req, res) => res.send('Hello World!'));
 
-        app.post('/pull-request', (req, res) => this._handle(this.onPullRequestChange.bind(this), req, res));
+        app.post('/pull-request', (req, res) => this._handle(this.onPullRequestChange, req, res));
         app.post('/status', (req, res) => this._handle(this.onRepoStatusChange.bind(this), req, res));
 
         app.listen(config.port, () => console.log(`Example app listening on port ${config.port}!`));

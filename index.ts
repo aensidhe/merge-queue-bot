@@ -1,8 +1,5 @@
 const config = require('config');
-const GitHubClient = require('./GitHubClient.js');
-const Bot = require('./Bot.js');
 const co = require('co');
-const RedisDal = require('./RedisDal.js');
 
 const github = new GitHubClient();
 const bot = new Bot(

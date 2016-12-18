@@ -3,8 +3,9 @@
         "allowJs": true,
         "target": "es6",
         "alwaysStrict": true,
-        "pretty": true,
-        "strictNullChecks": true
+        "strictNullChecks": true,
+        "outDir": "artifacts",
+        "moduleResolution": "node"
     },
     "compileOnSave": true,
     "typeAcquisition": {
