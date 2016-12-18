@@ -2,13 +2,13 @@ import * as TelegramBot from 'node-telegram-bot-api'
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
 class Bot {
-    private readonly _acl : Map<string, string>;
+    private readonly _acl : Map<string, string[]>;
     private readonly _gitHubClient: GitHubClient;
     private readonly _telegramConfig : Map<string, string>;
     private readonly _redisDal : RedisDal;
     private readonly _bot : TelegramBot
 
-    constructor(gitHubClient : GitHubClient, acl : Map<string, string>, redisDal : RedisDal, telegramConfig : Map<string, string>) {
+    constructor(gitHubClient : GitHubClient, acl : Map<string, string[]>, redisDal : RedisDal, telegramConfig : Map<string, string>) {
         this._acl = acl;
         this._gitHubClient = gitHubClient;
         this._telegramConfig = telegramConfig;
@@ -66,29 +66,27 @@ class Bot {
     }
 
     _hasAdminAccess(msg) {
-        for (let i = 0; i < this._acl.su.length; i++) {
-            if (this._acl.su[i] == msg.from.id)
+        for (let i = 0; i < this._acl['su'].length; i++) {
+            if (this._acl['su'][i] == msg.from.id)
                 return true;
         }
 
         return false;
     }
 
-    * _sendMessageToAllRepoChats(repository, message) {
-        let chats = new Set(yield this._redisDal.getBindedChats(repository));
-        for (var i = 2; i < arguments.length; i++) {
-            if (arguments[i] != undefined && arguments[i] != null)
-                chats.add(arguments[i].toString());
-        }
+    async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: number[]) {
+        let chats = new Set<string>(await this._redisDal.getBindedChats(repository));
 
-        yield this._sendToMultipleChats(message, chats);
+        chatIds.forEach(x => chats.add(x.toString()));
+
+        await this._sendToMultipleChats(message, chats);
     }
 
-    * _reportQueueToChat(repository, chatId) {
-        const queue = yield this._redisDal.getRepositoryQueue(repository);
+    async _reportQueueToChat(repository : Repository, chatId : number) {
+        const queue = await this._redisDal.getRepositoryQueue(repository);
         if (!queue || queue.length == 0)
         {
-            yield this._bot.sendMessage(
+            await this._bot.sendMessage(
                 chatId,
                 `Queue for ${repository} is empty`,
                 { parse_mode: 'Markdown' });
@@ -99,17 +97,17 @@ class Bot {
         queue.forEach(prId => {
             prGetters.push(this._redisDal.getPullRequest(repository, prId));
         });
-        const prs = yield prGetters;
+        const prs = await prGetters;
         let message = `Queue for ${repository}\n`;
         prs.forEach(pr => message += `- [#${pr.id}](${pr.url}) by ${pr.reporter.getMention()}\n`);
 
-        yield this._bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        await this._bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     }
 
-    * generalErrorHandler(reason, currentChatId) {
+    async generalErrorHandler(reason, currentChatId) {
         if (reason.messageFromBot && currentChatId) {
             console.log(reason.messageFromBot);
-            yield this._bot.sendMessage(
+            await this._bot.sendMessage(
                 currentChatId,
                 reason.messageFromBot);
         }
@@ -121,7 +119,7 @@ class Bot {
         return co(this.generalErrorHandler.bind(this), e, chatId);
     }
 
-    _handle(handler, msg, args, options) {
+    _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: any = {}) {
         options = options || {};
         console.log(`Received message: ${JSON.stringify(msg)}`)
         if (options.adminOnly && !this._hasAdminAccess(msg))
@@ -145,139 +143,139 @@ class Bot {
         }
     }
 
-    * _sendToMultipleChats(message, chatIds) {
-        let outbox = [];
-        chatIds.forEach(chatId => {
+    async _sendToMultipleChats(message : string, chatIds : Iterable<string>) {
+        var outbox = new Array<Promise<void>>()
+        for (let chatId in chatIds)
+        {
             outbox.push(this._bot.sendMessage(
                 chatId,
                 message,
                 { parse_mode: 'Markdown' }));
-        });
-        yield outbox;
+        }
+
+        await outbox;
     }
 
-    * onAddPullRequest(msg, args) {
+    async onAddPullRequest(msg, args) {
         const repository = new Repository(args[1], args[2]);
         const id = Number(args[3]);
 
         if (!msg.from)
             throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
 
-        const token = yield this._redisDal.getGithubToken(repository);
-        const githubPr = yield this._gitHubClient.GetPullRequest(repository, id, token);
+        const token = await this._redisDal.getGithubToken(repository);
+        const githubPr = await this._gitHubClient.GetPullRequest(repository, id, token);
 
-        const pr = new PullRequest(
-            repository,
-            id,
-            new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name),
-            new Date().getTime(),
-            githubPr.html_url,
-            githubPr.head.sha);
+        const pr = githubPr;
 
-        yield [
+        await [
             this._redisDal.savePullRequest(pr),
             this._redisDal.addPullRequestToQueue(pr)
         ];
 
-        yield this._sendMessageToAllRepoChats(
+        if (pr.reporter == null)
+        {
+            throw { messageFromBot: "Repo should be added by someone." }
+        }
+        await this._sendMessageToAllRepoChats(
             repository,
             `PR [#${pr.id}](${pr.url}) is added to queue by ${pr.reporter.getMention()}`,
             msg.chat.id);
     }
 
-    * onRemovePullRequest(msg, args) {
+    async onRemovePullRequest(msg, args) {
         const repository = new Repository(args[1], args[2]);
         const id = Number(args[3]);
 
-        const pr = yield this._redisDal.getPullRequest(repository, id);
+        const pr = await this._redisDal.getPullRequest(repository, id);
         if (!pr)
             throw { messageFromBot: 'PR not found' };
 
-        yield this._redisDal.removePullRequestFromQueue(pr);
+        await this._redisDal.removePullRequestFromQueue(pr);
 
-        yield this._sendMessageToAllRepoChats(
+        await this._sendMessageToAllRepoChats(
             repository,
             `PR [#${pr.id}](${pr.url}) is removed from queue by ${pr.reporter.getMention()}`,
             msg.chat.id,
             pr.reporter.id);
 
-        const next_pr = yield this._redisDal.getNextPullRequestFromQueue(repository);
+        const next_pr = await this._redisDal.getNextPullRequestFromQueue(repository);
 
         if (next_pr)
-            yield this._sendMessageToAllRepoChats(
+            await this._sendMessageToAllRepoChats(
                 repository,
                 `PR [#${next_pr.id}](${next_pr.url}) by ${next_pr.reporter.getMention()} is next in queue!`,
                 msg.chat.id,
                 next_pr.userid);
         else
-            yield this._sendMessageToAllRepoChats(
+            await this._sendMessageToAllRepoChats(
                 repository,
                 'Queue is empty!',
                 msg.chat.id);
     }
 
-    * onQueueRequestHandler(msg, args) {
-        let repositoriesToReport = yield this._redisDal.getBindedRepositories(msg.chat.id);
-        let reports = [];
+    async onQueueRequestHandler(msg, args) {
+        let repositoriesToReport = await this._redisDal.getBindedRepositories(msg.chat.id);
+        let reports = new Array<Promise<void>>();
         repositoriesToReport.forEach(repo => {
             reports.push(this._reportQueueToChat(repo, msg.chat.id));
         })
 
-        yield reports;
+        await reports;
     }
 
-    * onAddTokenHandler(msg, args) {
-        yield this._redisDal.saveToken(new Token(args[1], args[2]));
-        yield this._bot.sendMessage(
+    async onAddTokenHandler(msg, args) {
+        await this._redisDal.saveToken(new Token(args[1], args[2]));
+        await this._bot.sendMessage(
             msg.chat.id,
             `Token ${name} saved successfully.`);
     }
 
-    * onRemoveTokenHandler(msg, args) {
+    async onRemoveTokenHandler(msg, args) {
         const name = args[1];
-        yield this._redisDal.deleteToken(name);
-        yield this._bot.sendMessage(
+        await this._redisDal.deleteToken(name);
+        await this._bot.sendMessage(
             msg.chat.id,
             `Token ${name} deleted successfully.`);
     }
 
-    * onMapTokenHandler(msg, args) {
+    async onMapTokenHandler(msg, args) {
         const owner = args[1];
         const name = args[2];
-        yield this._redisDal.mapTokenToOwner(name, owner);
-        yield this._bot.sendMessage(
+        await this._redisDal.mapTokenToOwner(name, owner);
+        await this._bot.sendMessage(
             msg.chat.id,
             `Token ${name} will be used as an access to ${owner}`);
     }
 
-    * onBindRepoToChat(msg, args) {
+    async onBindRepoToChat(msg, args) {
         const repository = new Repository(args[1], args[2]);
 
-        yield this._redisDal.saveChatBinding(msg.chat.id, repository);
+        await this._redisDal.saveChatBinding(msg.chat.id, repository);
 
-        yield this._bot.sendMessage(
+        await this._bot.sendMessage(
             msg.chat.id,
             `This chat has been mapped to merge queue of ${repository}`);
     }
 
-    * onUnbindRepoToChat(msg, args) {
+    async onUnbindRepoToChat(msg, args) {
         const repository = new Repository(args[1], args[2]);
 
-        yield this._redisDal.removeChatBinding(msg.chat.id, repository);
+        await this._redisDal.removeChatBinding(msg.chat.id, repository);
 
-        yield this._bot.sendMessage(
+        await this._bot.sendMessage(
             msg.chat.id,
             `This chat has been unmapped from merge queue of ${repository}`);
     }
 
-    * sendFarewell(reason) {
-        if (this._telegramConfig.sendFarewells)
-            yield this._sendToMultipleChats(`Bot exited. Reason: ${reason}`, this._acl.su);
+    async sendFarewell(reason) {
+        if (this._telegramConfig['sendFarewells'])
+            await this._sendToMultipleChats(`Bot exited. Reason: ${reason}`, this._acl['su']);
     }
 
-    * sendGreetings() {
-        if (this._telegramConfig.sendGreetings)
-            yield this._sendToMultipleChats("Bot started.", this._acl.su);
+    async sendGreetings() {
+        if (this._telegramConfig['sendGreetings'])
+            await this._sendToMultipleChats("Bot started.", this._acl['su']);
     }
 }
 

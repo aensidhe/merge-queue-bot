@@ -17,7 +17,7 @@ class GitHubClient {
         // return github;
     }
 
-    * GetPullRequest(repository, id, token) {
+    async GetPullRequest(repository : Repository, id : number, token : string) : Promise<PullRequest> {
         // const github = this._getAuthenticatedClient(token);
         // let pr = yield github.pullRequests.get({
         //     owner: repository.owner,
@@ -28,8 +28,6 @@ class GitHubClient {
         // return pr;
     }
 
-    * SetCommitStatus(user, repo, id, status, token) {
+    async SetCommitStatus(user, repo, id, status, token) {
     }
 }
-
-module.exports = GitHubClient

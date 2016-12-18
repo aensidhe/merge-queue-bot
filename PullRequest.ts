@@ -22,7 +22,7 @@ class PullRequest {
         result[`${actualPrefix}.id`] = this.id;
         result[`${actualPrefix}.url`] = this.url;
         result[`${actualPrefix}.sha1`] = this.sha1;
-        result[`${actualPrefix}.reportedTime`] = this.reportedTime;
+        result[`${actualPrefix}.reportedTime`] = this.reportedTime.getTime();
 
         if (this.reporter) {
             this.reporter.toHash(result, `${actualPrefix}.reporter`);
@@ -48,7 +48,7 @@ class PullRequest {
         const id = hash['pullRequest.id'];
         const url = hash['pullRequest.url'];
         const sha1 = hash['pullRequest.sha1'];
-        const time = hash['pullRequest.reportedTime'];
+        const time = new Date(hash['pullRequest.reportedTime']);
 
         if (!id || !time) {
             return null;
