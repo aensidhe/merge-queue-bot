@@ -1,26 +1,28 @@
-const config = require('config');
-const co = require('co');
+import * as config from 'config';
+import { Bot } from './Bot';
+import { Dal } from './Redis/Dal'
+import { Config as RedisConfig } from './Redis/Config'
+import { Acl } from './Acl'
 
 const github = new GitHubClient();
 const bot = new Bot(
     github,
-    config.get('acl'),
-    new RedisDal(config.get('redis')),
-    config.get('telegram'));
+    config.get<Acl>('acl'),
+    new Dal(config.get<RedisConfig>('redis')),
+    config.get<TelegramConfig>('telegram'));
 
-function* onSigTerm(reason, e) {
-    yield bot.sendFarewell(e ? `${reason}: ${e}` : reason);
+async function onSigTerm(reason: string, e?: any) {
+    await bot.sendFarewell(e ? `${reason}: ${e}` : reason);
     process.exit(0);
 }
 
-function* onStartup() {
-    yield bot.sendGreetings();
+async function onStartup() {
+    await bot.sendGreetings();
 }
 
-process.on('SIGTERM', () => co(onSigTerm, 'SIGTERM'));
-process.on('SIGINT', () => co(onSigTerm, 'SIGINT'));
-process.on('exit', () => co(onSigTerm, 'exit'));
-process.on('uncaughtException', e => co(onSigTerm, 'uncaughtException', e));
+process.on('SIGTERM', () => onSigTerm('SIGTERM'));
+process.on('SIGINT', () => onSigTerm('SIGINT'));
+process.on('exit', () => onSigTerm('exit'));
+process.on('uncaughtException', e => onSigTerm('uncaughtException', e));
 
-co(onStartup);
-
+onStartup();

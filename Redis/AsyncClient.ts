@@ -1,8 +1,9 @@
 import { RedisClient, ResCallbackT, createClient } from 'redis';
+import { Config } from './Config'
 
 export class AsyncClient {
     private readonly _client : RedisClient;
-    constructor(redisConfig) {
+    constructor(redisConfig : Config) {
         this._client = createClient(redisConfig);
     }
 

@@ -1,7 +1,10 @@
 import { AsyncClient } from './AsyncClient'
-export class RedisDal {
+import { Config } from './Config'
+
+export class Dal {
     private readonly _client : AsyncClient;
-    constructor(redisConfig) {
+
+    constructor(redisConfig: Config) {
         this._client = new AsyncClient(redisConfig);
     }
 
