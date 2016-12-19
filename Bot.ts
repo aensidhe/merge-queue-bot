@@ -112,11 +112,7 @@ export class Bot {
         console.error(reason);
     }
 
-    handleError(e, chatId) {
-        return co(this.generalErrorHandler.bind(this), e, chatId);
-    }
-
-    _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: any = {}) {
+    async _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: any = {}) {
         options = options || {};
         console.log(`Received message: ${JSON.stringify(msg)}`)
         if (options.adminOnly && !this._hasAdminAccess(msg))
@@ -132,11 +128,10 @@ export class Bot {
         }
 
         try {
-            return co(handler, msg, args)
-                .catch(e => this.handleError(e, msg.chat.id));
+            await handler(msg, args);
         }
         catch(e) {
-            return this.handleError(e, msg.chat.Id);
+            await this.generalErrorHandler(e, msg.chat.Id);
         }
     }
 
@@ -206,17 +201,27 @@ export class Bot {
 
         const next_pr = await this._redisDal.getNextPullRequestFromQueue(repository);
 
-        if (next_pr)
-            await this._sendMessageToAllRepoChats(
-                repository,
-                `PR [#${next_pr.id}](${next_pr.url}) by ${next_pr.reporter.getMention()} is next in queue!`,
-                msg.chat.id,
-                next_pr.reporter.id);
-        else
+        if (next_pr == null) {
             await this._sendMessageToAllRepoChats(
                 repository,
                 'Queue is empty!',
                 msg.chat.id);
+            return;
+        }
+
+        if (next_pr.reporter == null) {
+            await this._sendMessageToAllRepoChats(
+                repository,
+                `PR [#${next_pr.id}](${next_pr.url}) is next in queue!`,
+                msg.chat.id);
+            return;
+        }
+
+        await this._sendMessageToAllRepoChats(
+                repository,
+                `PR [#${next_pr.id}](${next_pr.url}) by ${next_pr.reporter.getMention()} is next in queue!`,
+                msg.chat.id,
+                next_pr.reporter.id);
     }
 
     async onQueueRequestHandler(msg, args) {
