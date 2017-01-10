@@ -3,6 +3,16 @@ import { Dal } from './Redis/Dal'
 import { Acl } from './Acl'
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
+class HandlerOptions {
+    readonly adminOnly : boolean
+    readonly privateOnly : boolean
+
+    constructor(adminOnly: boolean, privateOnly: boolean) {
+        this.adminOnly = adminOnly;
+        this.privateOnly = privateOnly;
+    }
+}
+
 export class Bot {
     private readonly _acl : Acl;
     private readonly _gitHubClient: GitHubClient;
@@ -53,13 +63,15 @@ export class Bot {
         this._bot.onText(
             /\/bind (\S+) (\S+)/,
             (msg, args) => this._handle(this.onBindRepoToChat.bind(this), msg, args, {
-                adminOnly: true
+                adminOnly: true,
+                privateOnly: false
             }));
 
         this._bot.onText(
             /\/unbind (\S+) (\S+)/,
             (msg, args) => this._handle(this.onUnbindRepoToChat.bind(this), msg, args, {
-                adminOnly: true
+                adminOnly: true,
+                privateOnly: false
             }));
 
         this._bot.onText(
@@ -112,8 +124,8 @@ export class Bot {
         console.error(reason);
     }
 
-    async _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: any = {}) {
-        options = options || {};
+    async _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: HandlerOptions|null = null) {
+        options = options || new HandlerOptions(false, false);
         console.log(`Received message: ${JSON.stringify(msg)}`)
         if (options.adminOnly && !this._hasAdminAccess(msg))
             return;
