@@ -1,4 +1,4 @@
-class TelegramUser {
+export class TelegramUser {
     constructor(id: number, username: string, firstName: string, lastName: string) {
         this.id = id;
         this.username = username;
@@ -58,7 +58,7 @@ class TelegramUser {
 
         const username = hash[`${actualPrefix}.username`];
         const firstName = hash[`${actualPrefix}.firstName`];
-        const lastName = hash[`${actualPrefix}.lastName`]
+        const lastName = hash[`${actualPrefix}.lastName`];
 
         return new TelegramUser(id, username, firstName, lastName);
     }

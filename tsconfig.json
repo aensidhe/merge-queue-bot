@@ -1,14 +1,23 @@
 {
     "compilerOptions": {
         "allowJs": true,
-        "target": "es6",
+        "target": "es5",
         "alwaysStrict": true,
         "strictNullChecks": true,
         "outDir": "artifacts",
-        "moduleResolution": "node"
+        "moduleResolution": "node",
+        "sourceMap": true
     },
     "compileOnSave": true,
     "typeAcquisition": {
         "enable": true
-    }
+    },
+    "include": [
+        "**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "**/*.spec.ts",
+        "artifacts"
+    ]
 }

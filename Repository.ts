@@ -1,4 +1,4 @@
-class Repository {
+export class Repository {
     constructor(owner: string, repo: string) {
         this.owner = owner;
         this.name = repo;

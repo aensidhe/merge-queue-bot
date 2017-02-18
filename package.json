@@ -19,6 +19,7 @@
     "web-request": "1.0.7"
   },
   "devDependencies": {
+    "@types/core-js": "0.9.35",
     "typescript": "2.1.4"
   }
 }

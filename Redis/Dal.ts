@@ -1,5 +1,9 @@
 import { AsyncClient } from './AsyncClient'
 import { Config } from './Config'
+import {Repository} from "../Repository";
+import {PullRequest} from "../PullRequest";
+import {Token} from "../Token";
+import {Limits} from "./Limits";
 
 export class Dal {
     private readonly _client : AsyncClient;

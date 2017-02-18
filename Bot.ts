@@ -1,11 +1,16 @@
 import * as TelegramBot from 'node-telegram-bot-api'
 import { Dal } from './Redis/Dal'
 import { Acl } from './Acl'
+import { GitHubClient } from './GitHubClient'
+import {Repository} from "./Repository";
+import {TelegramUser} from "./TelegramUser";
+import {Token} from "./Token";
+import {TelegramConfig} from "./TelegramConfig";
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
 class HandlerOptions {
-    readonly adminOnly : boolean
-    readonly privateOnly : boolean
+    readonly adminOnly : boolean;
+    readonly privateOnly : boolean;
 
     constructor(adminOnly: boolean, privateOnly: boolean) {
         this.adminOnly = adminOnly;
@@ -18,7 +23,7 @@ export class Bot {
     private readonly _gitHubClient: GitHubClient;
     private readonly _telegramConfig : TelegramConfig;
     private readonly _redisDal : Dal;
-    private readonly _bot : TelegramBot
+    private readonly _bot : TelegramBot;
 
     constructor(gitHubClient : GitHubClient, acl :Acl, redisDal : Dal, telegramConfig : TelegramConfig) {
         this._acl = acl;
@@ -126,7 +131,7 @@ export class Bot {
 
     async _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: HandlerOptions|null = null) {
         options = options || new HandlerOptions(false, false);
-        console.log(`Received message: ${JSON.stringify(msg)}`)
+        console.log(`Received message: ${JSON.stringify(msg)}`);
         if (options.adminOnly && !this._hasAdminAccess(msg))
             return;
 
@@ -148,7 +153,7 @@ export class Bot {
     }
 
     async _sendToMultipleChats(message : string, chatIds : Iterable<string>) {
-        var outbox = new Array<Promise<void>>()
+        let outbox = new Array<Promise<void>>();
         for (let chatId of chatIds)
         {
             outbox.push(this._bot.sendMessage(
@@ -168,9 +173,8 @@ export class Bot {
             throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
 
         const token = await this._redisDal.getGithubToken(repository);
-        const githubPr = await this._gitHubClient.GetPullRequest(repository, id, token);
-
-        const pr = githubPr;
+        const reporter = new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
+        const pr = await this._gitHubClient.GetPullRequest(repository, reporter, id, token);
 
         await Promise.all([
             this._redisDal.savePullRequest(pr),
@@ -241,7 +245,7 @@ export class Bot {
         let reports = new Array<Promise<void>>();
         repositoriesToReport.forEach(repo => {
             reports.push(this._reportQueueToChat(repo, msg.chat.id));
-        })
+        });
 
         await reports;
     }

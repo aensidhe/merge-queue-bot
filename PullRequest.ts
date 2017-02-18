@@ -1,4 +1,7 @@
-class PullRequest {
+import {Repository} from "./Repository";
+import {TelegramUser} from "./TelegramUser";
+
+export class PullRequest {
     constructor(repository: Repository, id: number, reporter: TelegramUser|null, reportedTime: Date, url: string, sha1:string) {
         this.repository = repository;
         this.reporter = reporter;

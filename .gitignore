@@ -2,3 +2,4 @@ node_modules
 redis_data
 development.json
 artifacts
+.idea

@@ -1,4 +1,4 @@
-class Limits {
+export class Limits {
     constructor(offset: number, count: number) {
         this.offset = offset;
         this.count = count;

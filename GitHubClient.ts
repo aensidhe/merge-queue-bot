@@ -1,33 +1,40 @@
-class GitHubClient {
-    _getAuthenticatedClient(token) {
-        // let github = new GitHubApi({
-        //     headers: {
-        //         'user-agent': 'Merge queue telegram bot' // GitHub is happy with a unique user agent
-        //     },
-        //     followRedirects: false, // default: true; there's currently an issue with non-get redirects, so allow ability to disable follow-redirects
-        // });
+import * as WebRequest from 'web-request';
+import { Repository } from './Repository'
+import { TelegramUser } from './TelegramUser'
+import { PullRequest } from './PullRequest'
 
-        // console.log('Trying to authenticate in github')
-        // github.authenticate({
-        //     type: 'oauth',
-        //     token: token
-        // });
-        // console.log('Authenticated successfully in github')
-
-        // return github;
+export class GitHubClient {
+    private _getOptions(token: string): WebRequest.RequestOptions {
+        return {
+            headers: {
+                'user-agent': 'Merge queue telegram bot',
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        };
     }
 
-    async GetPullRequest(repository : Repository, id : number, token : string) : Promise<PullRequest> {
-        // const github = this._getAuthenticatedClient(token);
-        // let pr = yield github.pullRequests.get({
-        //     owner: repository.owner,
-        //     repo: repository.name,
-        //     number: id
-        // });
-        // console.log(`Got PR ${id} url: ${pr.html_url} and ${pr.head.sha}`);
-        // return pr;
+    public async GetPullRequest(repository : Repository, reporter : TelegramUser, id : number, token : string) : Promise<PullRequest> {
+        let response = await WebRequest.get(
+            `https://api.github.com/repos/${repository.owner}/${repository.name}/pulls/${id}`,
+            this._getOptions(token)
+        );
+
+        if (response.statusCode != 200)
+            throw new Error("Not 200 code in response");
+
+        let pr = JSON.parse(response.content);
+
+        return new PullRequest(
+            repository,
+            id,
+            reporter,
+            new Date(),
+            pr.html_url,
+            pr.head.sha
+        )
     }
 
-    async SetCommitStatus(user, repo, id, status, token) {
+    public async SetCommitStatus(user, repo, id, status, token) {
     }
 }

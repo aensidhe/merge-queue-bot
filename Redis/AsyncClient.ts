@@ -1,5 +1,6 @@
 import { RedisClient, ResCallbackT, createClient } from 'redis';
 import { Config } from './Config'
+import {Limits} from "./Limits";
 
 export class AsyncClient {
     private readonly _client : RedisClient;
@@ -34,8 +35,9 @@ export class AsyncClient {
 
     async hmset(name: string, fields: Map<string, any>) {
         let args = new Array<any>();
-        for (let x of fields) {
-            args.push(x[0], x[1])
+        args.push(name);
+        for (let key in fields) {
+            args.push(key, fields[key])
         }
         return await AsyncClient.redisCall<void>(this._client.hmset, args);
     }
