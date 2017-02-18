@@ -6,6 +6,7 @@ import {Repository} from "./Repository";
 import {TelegramUser} from "./TelegramUser";
 import {Token} from "./Token";
 import {TelegramConfig} from "./TelegramConfig";
+import {PullRequest} from "./PullRequest";
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
 class HandlerOptions {
@@ -98,7 +99,7 @@ export class Bot {
 
         chatIds.forEach(x => chats.add(x.toString()));
 
-        await this._sendToMultipleChats(message, chats);
+        await this._sendToMultipleChats(message, Array.from(chats.values()));
     }
 
     async _reportQueueToChat(repository : Repository, chatId : number) {
@@ -152,7 +153,7 @@ export class Bot {
         }
     }
 
-    async _sendToMultipleChats(message : string, chatIds : Iterable<string>) {
+    async _sendToMultipleChats(message : string, chatIds : Array<string>) {
         let outbox = new Array<Promise<void>>();
         for (let chatId of chatIds)
         {
@@ -174,7 +175,8 @@ export class Bot {
 
         const token = await this._redisDal.getGithubToken(repository);
         const reporter = new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
-        const pr = await this._gitHubClient.GetPullRequest(repository, reporter, id, token);
+        const [url, head] = await this._gitHubClient.GetPrUrlAndHead(repository, id, token);
+        const pr = new PullRequest(repository, id, reporter, new Date(), url, head);
 
         await Promise.all([
             this._redisDal.savePullRequest(pr),

@@ -8,9 +8,9 @@ export class AsyncClient {
         this._client = createClient(redisConfig);
     }
 
-    private static redisCall<T>(method: (args: any[], callback?: ResCallbackT<T>) => boolean, ...args: any[]) {
+    private static redisCall<T>(method: (...args: any[]) => boolean, ...args: any[]) {
         return new Promise<T>((resolve, reject) => {
-            method(args, (e, r) => {
+            method(...args, (e, r) => {
                 if (e) reject(e);
                 else resolve(r);
             });
@@ -18,19 +18,19 @@ export class AsyncClient {
     }
 
     async del(name: string) {
-        return await AsyncClient.redisCall<void>(this._client.del, name);
+        return await AsyncClient.redisCall<void>(this._client.del.bind(this._client), name);
     }
 
     async hget(name: string, field: string) {
-        return await AsyncClient.redisCall<string>(this._client.hget, name, field);
+        return await AsyncClient.redisCall<string>(this._client.hget.bind(this._client), name, field);
     }
 
     async hgetall(name: string) {
-        return await AsyncClient.redisCall<Map<string, any>>(this._client.hgetall, name);
+        return await AsyncClient.redisCall<Map<string, any>>(this._client.hgetall.bind(this._client), name);
     }
 
     async hset(name: string, field: string, value: any) {
-        return await AsyncClient.redisCall<void>(this._client.hset, name, field, value);
+        return await AsyncClient.redisCall<void>(this._client.hset.bind(this._client), name, field, value);
     }
 
     async hmset(name: string, fields: Map<string, any>) {
@@ -39,19 +39,19 @@ export class AsyncClient {
         for (let key in fields) {
             args.push(key, fields[key])
         }
-        return await AsyncClient.redisCall<void>(this._client.hmset, args);
+        return await AsyncClient.redisCall<void>(this._client.hmset.bind(this._client), args);
     }
 
     async hdel(name: string, field: string) {
-        return await AsyncClient.redisCall<void>(this._client.hdel, name, field);
+        return await AsyncClient.redisCall<void>(this._client.hdel.bind(this._client), name, field);
     }
 
     async zadd(name: string, field: string, score: number) {
-        return await AsyncClient.redisCall<void>(this._client.zadd, name, score, field);
+        return await AsyncClient.redisCall<void>(this._client.zadd.bind(this._client), name, score, field);
     }
 
     async zrem(name: string, field: string) {
-        return await AsyncClient.redisCall<void>(this._client.zadd, name, field);
+        return await AsyncClient.redisCall<void>(this._client.zrem.bind(this._client), name, field);
     }
 
     async zrangebyscore<T>(name: string, min?: number, max?: number, limitSettings?: Limits) {
@@ -64,18 +64,18 @@ export class AsyncClient {
             args.push(limitSettings.offset);
             args.push(limitSettings.count);
         }
-        return await AsyncClient.redisCall<T[]>(this._client.zrangebyscore, args);
+        return await AsyncClient.redisCall<T[]>(this._client.zrangebyscore.bind(this._client), args);
     }
 
     async sadd(name: string, value: string) {
-        return await AsyncClient.redisCall<void>(this._client.sadd, name, value);
+        return await AsyncClient.redisCall<void>(this._client.sadd.bind(this._client), name, value);
     }
 
     async srem(name: string, value: string) {
-        return await AsyncClient.redisCall<void>(this._client.srem, name, value);
+        return await AsyncClient.redisCall<void>(this._client.srem.bind(this._client), name, value);
     }
 
     async smembers<T>(name: string) {
-        return await AsyncClient.redisCall<T[]>(this._client.smembers, name);
+        return await AsyncClient.redisCall<T[]>(this._client.smembers.bind(this._client), name);
     }
 }

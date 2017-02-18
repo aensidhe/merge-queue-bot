@@ -1,7 +1,5 @@
 import * as WebRequest from 'web-request';
 import { Repository } from './Repository'
-import { TelegramUser } from './TelegramUser'
-import { PullRequest } from './PullRequest'
 
 export class GitHubClient {
     private _getOptions(token: string): WebRequest.RequestOptions {
@@ -14,7 +12,7 @@ export class GitHubClient {
         };
     }
 
-    public async GetPullRequest(repository : Repository, reporter : TelegramUser, id : number, token : string) : Promise<PullRequest> {
+    public async GetPrUrlAndHead(repository: Repository, id: number, token: string): Promise<[string, string]> {
         let response = await WebRequest.get(
             `https://api.github.com/repos/${repository.owner}/${repository.name}/pulls/${id}`,
             this._getOptions(token)
@@ -25,14 +23,10 @@ export class GitHubClient {
 
         let pr = JSON.parse(response.content);
 
-        return new PullRequest(
-            repository,
-            id,
-            reporter,
-            new Date(),
+        return [
             pr.html_url,
             pr.head.sha
-        )
+        ]
     }
 
     public async SetCommitStatus(user, repo, id, status, token) {
