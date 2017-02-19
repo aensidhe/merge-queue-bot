@@ -1,4 +1,4 @@
-FROM mhart/alpine-node:4
+FROM mhart/alpine-node:6
 MAINTAINER aensidhe
 
 ENV NODE_CONFIG_DIR ./config
@@ -13,6 +13,8 @@ RUN mkdir -p $APP_HOME && cp -a /tmp/node_modules $APP_HOME
 WORKDIR $APP_HOME
 ADD . $APP_HOME
 
+RUN node_modules/typescript/bin/tsc -p .
+
 EXPOSE 80
 
-CMD ["node", "index.js"]
+CMD ["node", "artifacts/index.js"]

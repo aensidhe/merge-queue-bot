@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@types/core-js": "0.9.35",
+    "@types/node": "^7.0.5",
     "typescript": "2.1.4"
   }
 }
