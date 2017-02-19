@@ -34,7 +34,7 @@ export class Bot {
         this._bot = new TelegramBot(this._telegramConfig.token, {polling: true});
 
         this._bot.onText(
-            new RegExp(`/add ${githubPattern}`),
+            new RegExp(`/(add|hotfix) ${githubPattern}`),
             (msg, args) => this._handle(this.onAddPullRequest.bind(this), msg, args));
 
         this._bot.onText(
@@ -167,8 +167,9 @@ export class Bot {
     }
 
     async onAddPullRequest(msg, args) {
-        const repository = new Repository(args[1], args[2]);
-        const id = Number(args[3]);
+        const action = args[1];
+        const repository = new Repository(args[2], args[3]);
+        const id = Number(args[4]);
 
         if (!msg.from)
             throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
@@ -177,16 +178,18 @@ export class Bot {
         const reporter = new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
         const [url, head] = await this._gitHubClient.GetPrUrlAndHead(repository, id, token);
         const pr = new PullRequest(repository, id, reporter, new Date(), url, head);
-
         await Promise.all([
             this._redisDal.savePullRequest(pr),
-            this._redisDal.addPullRequestToQueue(pr)
+            action == "add"
+                ? this._redisDal.addPullRequestToQueue(pr)
+                : this._redisDal.addHotfixToQueue(pr)
         ]);
 
         if (pr.reporter == null)
         {
             throw { messageFromBot: "Repo should be added by someone." }
         }
+
         await this._sendMessageToAllRepoChats(
             repository,
             `PR [#${pr.id}](${pr.url}) is added to queue by ${pr.reporter.getMention()}`,

@@ -49,6 +49,13 @@ export class Dal {
             pullRequest.reportedTime.getTime());
     }
 
+    async addHotfixToQueue(pullRequest: PullRequest) {
+        await this._client.zadd(
+            this._getQueueKey(pullRequest.repository),
+            pullRequest.id.toString(),
+            -pullRequest.reportedTime.getTime());
+    }
+
     async removePullRequestFromQueue(pullRequest: PullRequest) {
         await this._client.zrem(
             this._getQueueKey(pullRequest.repository),
