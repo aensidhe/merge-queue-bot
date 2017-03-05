@@ -49,11 +49,25 @@ export class Dal {
             pullRequest.reportedTime.getTime());
     }
 
-    async addHotfixToQueue(pullRequest: PullRequest) {
+    async addHotfixToQueue(pullRequest: PullRequest) : Promise<PullRequest|null> {
         await this._client.zadd(
             this._getQueueKey(pullRequest.repository),
             pullRequest.id.toString(),
             -pullRequest.reportedTime.getTime());
+        let ids = await this._client.zrangebyscore<number>(this._getQueueKey(pullRequest.repository));
+        let next = false;
+        for (let id of ids) {
+            if (id == pullRequest.id) {
+                next = true;
+                continue;
+            }
+
+            if (next) {
+                return await this.getPullRequest(pullRequest.repository, id);
+            }
+        }
+
+        return null;
     }
 
     async removePullRequestFromQueue(pullRequest: PullRequest) {
