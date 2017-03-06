@@ -20,7 +20,7 @@ export class TelegramUser {
             result = this.lastName;
 
         if (this.firstName)
-            result = result ? `${this.firstName} {result}` : this.firstName;
+            result = result ? `${this.firstName} ${result}` : this.firstName;
 
         return result ? result : this.id;
     }
