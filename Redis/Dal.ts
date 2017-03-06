@@ -122,14 +122,16 @@ export class Dal {
     async saveChatBinding(chatId: number, repository: Repository) {
         await Promise.all([
             this._client.sadd(`repo_chats:${chatId}`, `${repository}`),
-            this._client.sadd(`repo_chats:${repository}`, chatId.toString())
+            this._client.sadd(`repo_chats:${repository}`, chatId.toString()),
+            this._client.sadd(`chats:binded`, chatId.toString())
         ]);
     }
 
     async removeChatBinding(chatId: number, repository: Repository) {
         await Promise.all([
             this._client.srem(`repo_chats:${chatId}`, `${repository}`),
-            this._client.srem(`repo_chats:${repository}`, chatId.toString())
+            this._client.srem(`repo_chats:${repository}`, chatId.toString()),
+            this._client.srem("chats:binded", chatId.toString())
         ]);
     }
 
@@ -147,5 +149,9 @@ export class Dal {
 
     async getBindedChats(repository: Repository) {
         return await this._client.smembers<string>(`repo_chats:${repository}`);
+    }
+
+    async getAllBindedChats() {
+        return await this._client.smembers<string>("chats:binded");
     }
 }

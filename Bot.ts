@@ -89,7 +89,7 @@ export class Bot {
             (msg) => this._bot.sendMessage(msg.chat.id, 'pong'));
     }
 
-    _hasAdminAccess(msg) {
+    private _hasAdminAccess(msg) {
         for (let i = 0; i < this._acl['su'].length; i++) {
             if (this._acl['su'][i] == msg.from.id)
                 return true;
@@ -98,10 +98,18 @@ export class Bot {
         return false;
     }
 
-    async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: number[]) {
+    private async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: number[]) {
         let chats = new Set<string>(await this._redisDal.getBindedChats(repository));
 
         chatIds.forEach(x => chats.add(x.toString()));
+
+        await this._sendToMultipleChats(message, Array.from(chats.values()));
+    }
+
+    private async _reportToAllChats(message : string) {
+        let chats = new Set<string>(await this._redisDal.getAllBindedChats());
+
+        this._acl.su.forEach(x => chats.add(x));
 
         await this._sendToMultipleChats(message, Array.from(chats.values()));
     }
@@ -123,7 +131,7 @@ export class Bot {
         await this._bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     }
 
-    async generalErrorHandler(reason, currentChatId) {
+    private async generalErrorHandler(reason, currentChatId) {
         if (reason.messageFromBot && currentChatId) {
             console.log(reason.messageFromBot);
             await this._bot.sendMessage(
@@ -134,7 +142,7 @@ export class Bot {
         console.error(reason);
     }
 
-    async _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: HandlerOptions|null = null) {
+    private async _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: HandlerOptions|null = null) {
         options = options || new HandlerOptions(false, false);
         console.log(`Received message: ${JSON.stringify(msg)}`);
         if (options.adminOnly && !this._hasAdminAccess(msg))
@@ -341,11 +349,11 @@ export class Bot {
 
     async sendFarewell(reason) {
         if (this._telegramConfig.sendFarewells)
-            await this._sendToMultipleChats(`Bot exited. Reason: ${reason}`, this._acl.su);
+            await this._reportToAllChats(`Bot exited. Reason: ${reason}`);
     }
 
     async sendGreetings() {
         if (this._telegramConfig.sendGreetings)
-            await this._sendToMultipleChats("Bot started.", this._acl.su);
+            await this._reportToAllChats("Bot started.");
     }
 }
