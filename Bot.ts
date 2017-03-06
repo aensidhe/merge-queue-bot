@@ -9,7 +9,7 @@ import {TelegramConfig} from "./TelegramConfig";
 import {PullRequest} from "./PullRequest";
 const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
-class HandlerOptions {
+class CommandOptions {
     readonly adminOnly : boolean;
     readonly privateOnly : boolean;
 
@@ -19,7 +19,37 @@ class HandlerOptions {
     }
 }
 
+class BotCommand {
+    readonly isNew: Boolean;
+    readonly options: CommandOptions;
+    readonly pattern : string;
+    readonly description : string;
+    readonly handler : (msg: any, args: any) => Promise<void>;
+
+    constructor(pattern : string, description : string, handler : (msg: any, args: any) => Promise<void>, options: CommandOptions = new CommandOptions(false, false), isNew : Boolean = false) {
+        this.pattern = pattern;
+        this.description = description;
+        this.handler = handler;
+        this.options = options;
+        this.isNew = isNew;
+    }
+}
+
 export class Bot {
+    private static readonly PrivateAdminCommand : CommandOptions = {
+        adminOnly : true,
+        privateOnly : true
+    };
+    private static readonly PublicAdminCommand : CommandOptions = {
+        adminOnly : true,
+        privateOnly : false
+    };
+    private static readonly PrivateCommand : CommandOptions = {
+        adminOnly : false,
+        privateOnly : true
+    };
+
+    private readonly _commands : BotCommand[];
     private readonly _acl : Acl;
     private readonly _gitHubClient: GitHubClient;
     private readonly _telegramConfig : TelegramConfig;
@@ -33,60 +63,114 @@ export class Bot {
         this._redisDal = redisDal;
         this._bot = new TelegramBot(this._telegramConfig.token, {polling: true});
 
-        this._bot.onText(
-            new RegExp(`/add ${githubPattern}`),
-            (msg, args) => this._handle(this.onAddPullRequest.bind(this), msg, args));
+        // TypeScript and Javascript do not support named groups in RegExp, so unfortunately we need to repeat ourselves
+        this._commands = [
+            new BotCommand(
+                `/add ${githubPattern}`,
+                `
+/add https://github.com/{owner}/{repo}/pull/{id}
+Adds PR to end of queue and reports it to queue chats.`,
+                this.onAddPullRequest.bind(this),
+                Bot.PrivateCommand),
 
-        this._bot.onText(
-            new RegExp(`/hotfix ${githubPattern}`),
-            (msg, args) => this._handle(this.onAddHotfixPullRequest.bind(this), msg, args));
+            new BotCommand(
+                `/hotfix ${githubPattern}`,
+                `
+/hotfix https://github.com/{owner}/{repo}/pull/{id}
+Adds PR to head of queue. Reports it to queue chats and to previous leader, if any.`,
+                this.onAddHotfixPullRequest.bind(this),
+                Bot.PrivateCommand,
+                true),
 
-        this._bot.onText(
-            new RegExp(`/remove ${githubPattern}`),
-            (msg, args) => this._handle(this.onRemovePullRequest.bind(this), msg, args));
+            new BotCommand(
+                `/remove ${githubPattern}`,
+                `
+/remove https://github.com/{owner}/{repo}/pull/{id}
+Removes PR from queue. Reports it to queue chats and to new leader, if any.`,
+                this.onRemovePullRequest.bind(this),
+                Bot.PrivateCommand),
 
-        this._bot.onText(
-            /\/queue/,
-            (msg, args) => this._handle(this.onQueueRequestHandler.bind(this), msg, args));
+            new BotCommand(
+                "/queue",
+                `
+/queue
+Prints queue for this chat.`,
+                this.onQueueRequestHandler.bind(this)),
 
-        this._bot.onText(
-            /\/add_token (\S+) (\S+)/,
-            (msg, args) => this._handle(this.onAddTokenHandler.bind(this), msg, args, {
-                adminOnly: true,
-                privateOnly: true
-            }));
+            new BotCommand(
+                "/add_token (\S+) (\S+)",
+                `
+/add_token {token_name} {token}
+Adds github token to database.`,
+                this.onAddTokenHandler.bind(this),
+                Bot.PrivateAdminCommand),
 
-        this._bot.onText(
-            /\/remove_token (\S+)/,
-            (msg, args) => this._handle(this.onRemoveTokenHandler.bind(this), msg, args, {
-                adminOnly: true,
-                privateOnly: true
-            }));
+            new BotCommand(
+                "/remove_token (\S+)",
+                `
+/remove_token {token_name}
+Removes github token from database.`,
+                this.onRemoveTokenHandler.bind(this),
+                Bot.PrivateAdminCommand),
 
-        this._bot.onText(
-            /\/map_token (\S+) (\S+)/,
-            (msg, args) => this._handle(this.onMapTokenHandler.bind(this), msg, args, {
-                adminOnly: true,
-                privateOnly: true
-            }));
+            new BotCommand(
+                "/map_token (\S+) (\S+)",
+                `
+/map_token {owner} {token_name}
+Maps token_name to owner.`,
+                this.onMapTokenHandler.bind(this),
+                Bot.PrivateAdminCommand),
 
-        this._bot.onText(
-            /\/bind (\S+) (\S+)/,
-            (msg, args) => this._handle(this.onBindRepoToChat.bind(this), msg, args, {
-                adminOnly: true,
-                privateOnly: false
-            }));
+            new BotCommand(
+                "/bind (\S+) (\S+)",
+                `
+/bind {owner} {repo}
+Bind this chat to owner/repo notification.`,
+                this.onBindRepoToChat.bind(this),
+                Bot.PublicAdminCommand),
 
-        this._bot.onText(
-            /\/unbind (\S+) (\S+)/,
-            (msg, args) => this._handle(this.onUnbindRepoToChat.bind(this), msg, args, {
-                adminOnly: true,
-                privateOnly: false
-            }));
+            new BotCommand(
+                "/unbind (\S+) (\S+)",
+                `
+/unbind {owner} {repo}
+Bind this chat to owner/repo notification.`,
+                this.onUnbindRepoToChat.bind(this),
+                Bot.PublicAdminCommand),
 
-        this._bot.onText(
-            /\/ping/,
-            (msg) => this._bot.sendMessage(msg.chat.id, 'pong'));
+            new BotCommand(
+                "/ping",
+                `
+/ping
+Returns pong. Works only in private chat`,
+                this.onPing.bind(this),
+                Bot.PrivateCommand,
+                true),
+
+            new BotCommand(
+                "/help",
+                `
+/help
+Returns help. Works only in private chat`,
+                this.onHelp.bind(this),
+                Bot.PrivateCommand,
+                true),
+
+            new BotCommand(
+                "/new",
+                `
+/new
+Returns only new commands in this release. Works only in private chat`,
+                this.onNewCommands.bind(this),
+                Bot.PrivateCommand,
+                true)
+        ];
+
+        for (let cmd of this._commands) {
+            this._bot.onText(
+                new RegExp(cmd.pattern),
+                (msg, args) => this._handle(cmd.handler, msg, args, cmd.options)
+            )
+        }
     }
 
     private _hasAdminAccess(msg) {
@@ -142,8 +226,7 @@ export class Bot {
         console.error(reason);
     }
 
-    private async _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: HandlerOptions|null = null) {
-        options = options || new HandlerOptions(false, false);
+    private async _handle(handler : (msg: any, args: any) => Promise<void>, msg : any, args : any, options: CommandOptions) {
         console.log(`Received message: ${JSON.stringify(msg)}`);
         if (options.adminOnly && !this._hasAdminAccess(msg))
             return;
@@ -345,6 +428,43 @@ export class Bot {
         await this._bot.sendMessage(
             msg.chat.id,
             `This chat has been unmapped from merge queue of ${repository}`);
+    }
+
+    async onPing(msg, args) {
+        await this._bot.sendMessage(msg.chat.id, "Pong");
+    }
+
+    private async _printHelp(msg, shouldPrint : (command: BotCommand) => Boolean) {
+        const isAdmin = this._hasAdminAccess(msg);
+        let help = "";
+        for (let cmd of this._commands) {
+            if (cmd.options.adminOnly && !isAdmin) {
+                continue;
+            }
+
+            if (!shouldPrint(cmd)) {
+                continue;
+            }
+
+            help += cmd.description + "\n";
+            if (cmd.options.adminOnly) {
+                help += "Admin only command.\n"
+            }
+
+            if (cmd.options.privateOnly) {
+                help += "Works only in private chat.\n"
+            }
+        }
+
+        await this._bot.sendMessage(msg.chat.id, help);
+    }
+
+    async onHelp(msg, args) {
+        await this._printHelp(msg, _ => true);
+    }
+
+    async onNewCommands(msg, args) {
+        await this._printHelp(msg, x => x.isNew);
     }
 
     async sendFarewell(reason) {
