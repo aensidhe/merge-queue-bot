@@ -141,7 +141,7 @@ Bind this chat to owner/repo notification.`,
                 "/ping",
                 `
 /ping
-Returns pong. Works only in private chat`,
+Returns pong.`,
                 this.onPing.bind(this),
                 Bot.PrivateCommand,
                 true),
@@ -150,7 +150,7 @@ Returns pong. Works only in private chat`,
                 "/help",
                 `
 /help
-Returns help. Works only in private chat`,
+Returns help.`,
                 this.onHelp.bind(this),
                 Bot.PrivateCommand,
                 true),
@@ -159,7 +159,7 @@ Returns help. Works only in private chat`,
                 "/new",
                 `
 /new
-Returns only new commands in this release. Works only in private chat`,
+Returns only new commands in this release.`,
                 this.onNewCommands.bind(this),
                 Bot.PrivateCommand,
                 true)
