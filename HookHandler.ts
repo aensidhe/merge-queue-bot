@@ -67,6 +67,8 @@ export class HookHandler {
         for (let chat of chats) {
             chatIds.push(Number(chat));
         }
+
         await this._bot.removePullRequest(repo, id, ...chatIds);
+        res.sendStatus(200);
     }
 }

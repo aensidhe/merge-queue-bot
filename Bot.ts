@@ -194,7 +194,7 @@ Returns only new commands in this release.`,
     private async _reportToAllChats(message : string) {
         let chats = new Set<string>(await this._redisDal.getAllBindedChats());
 
-        this._acl.su.forEach(x => chats.add(x));
+        this._acl.su.forEach(x => chats.add(x.toString()));
 
         await this._sendToMultipleChats(message, Array.from(chats.values()));
     }
