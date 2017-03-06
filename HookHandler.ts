@@ -41,8 +41,6 @@ export class HookHandler {
         this._redisDal = dal;
     }
 
-    private
-
     private _parseUrl(url: string) : [Repository, Number] {
         let parseResult = this._urlParser.exec(url);
         if (parseResult == null) {
