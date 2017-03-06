@@ -84,7 +84,11 @@ export class Dal {
         return await this.getPullRequest(repository, nextId[0]);
     }
 
-    _getPullRequestKey(repository: Repository, id: number) {
+    async getPullRequestIndex(pr: PullRequest) {
+        return await this._client.zrank(this._getQueueKey(pr.repository), pr.id.toString());
+    }
+
+    private _getPullRequestKey(repository: Repository, id: number) {
         return `${repository}/${id}`;
     }
 

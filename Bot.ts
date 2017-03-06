@@ -261,7 +261,7 @@ Returns only new commands in this release.`,
         await Promise.all(outbox);
     }
 
-    async onAddPullRequest(msg, args) {
+    async _getPullRequestFromArgs(msg, args) : Promise<PullRequest> {
         const repository = new Repository(args[1], args[2]);
         const id = Number(args[3]);
 
@@ -269,62 +269,68 @@ Returns only new commands in this release.`,
             throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
 
         const token = await this._redisDal.getGithubToken(repository);
+        const githubPr = await this._gitHubClient.GetGithubPr(repository, id, token);
         const reporter = new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
-        const [url, head] = await this._gitHubClient.GetPrUrlAndHead(repository, id, token);
-        const pr = new PullRequest(repository, id, reporter, new Date(), url, head);
+        return new PullRequest(repository, id, reporter, new Date(), githubPr.html_url, githubPr.head.ref);
+    }
+
+    async _reportGithubStatus(pr: PullRequest) {
+        const [index, token] = await Promise.all([
+            this._redisDal.getPullRequestIndex(pr),
+            this._redisDal.getGithubToken(pr.repository)
+        ]);
+        const githubPr = await this._gitHubClient.GetGithubPr(pr.repository, pr.id, token);
+        if (githubPr.state != "open") {
+            return;
+        }
+
+        if (index == 0) {
+            await this._gitHubClient.SetCommitSuccess(pr, githubPr.head.sha1, token);
+        } else {
+            await this._gitHubClient.SetCommitPending(pr, githubPr.head.sha1, token);
+        }
+    }
+
+    async onAddPullRequest(msg, args) {
+        const pr = await this._getPullRequestFromArgs(msg, args);
         await Promise.all([
             this._redisDal.savePullRequest(pr),
             this._redisDal.addPullRequestToQueue(pr)
         ]);
 
-        if (pr.reporter == null)
-        {
-            throw { messageFromBot: "Repo should be added by someone." }
-        }
-
         await this._sendMessageToAllRepoChats(
-            repository,
+            pr.repository,
             `PR [#${pr.id}](${pr.url}) is added to queue by ${pr.reporter.getMention()}`,
             msg.chat.id);
+        await this._reportGithubStatus(pr);
     }
 
     async onAddHotfixPullRequest(msg, args) {
-        const repository = new Repository(args[1], args[2]);
-        const id = Number(args[3]);
+        const pr = await this._getPullRequestFromArgs(msg, args);
 
-        if (!msg.from)
-            throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
-
-        const token = await this._redisDal.getGithubToken(repository);
-        const reporter = new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
-        const [url, head] = await this._gitHubClient.GetPrUrlAndHead(repository, id, token);
-        const pr = new PullRequest(repository, id, reporter, new Date(), url, head);
         const results = await Promise.all([
             this._redisDal.savePullRequest(pr),
             this._redisDal.addHotfixToQueue(pr)
         ]);
         const formerFirst = results[1];
 
-        if (pr.reporter == null)
-        {
-            throw { messageFromBot: "Repo should be added by someone." }
-        }
-
-        if (formerFirst == null || formerFirst.reporter == null)
+        if (formerFirst == null)
         {
             await this._sendMessageToAllRepoChats(
-                repository,
+                pr.repository,
                 `PR [#${pr.id}](${pr.url}) is a HOTFIX by ${pr.reporter.getMention()}`,
                 msg.chat.id);
         }
         else
         {
             await this._sendMessageToAllRepoChats(
-                repository,
+                pr.repository,
                 `PR [#${pr.id}](${pr.url}) is a HOTFIX by ${pr.reporter.getMention()}`,
                 msg.chat.id,
                 formerFirst.reporter.id);
         }
+
+        await this._reportGithubStatus(pr);
     }
 
     async onRemovePullRequest(msg, args) {
@@ -352,6 +358,7 @@ Returns only new commands in this release.`,
         }
 
         const next_pr = await this._redisDal.getNextPullRequestFromQueue(repository);
+        await this._reportGithubStatus(pr);
 
         if (next_pr == null) {
             await this._sendMessageToAllRepoChats(
@@ -361,19 +368,13 @@ Returns only new commands in this release.`,
             return;
         }
 
-        if (next_pr.reporter == null) {
-            await this._sendMessageToAllRepoChats(
-                repository,
-                `PR [#${next_pr.id}](${next_pr.url}) is next in queue!`,
-                msg.chat.id);
-            return;
-        }
-
         await this._sendMessageToAllRepoChats(
             repository,
             `PR [#${next_pr.id}](${next_pr.url}) by ${next_pr.reporter.getMention()} is next in queue!`,
             msg.chat.id,
             next_pr.reporter.id);
+
+        await this._reportGithubStatus(next_pr);
     }
 
     async onQueueRequestHandler(msg, args) {
