@@ -5,13 +5,17 @@ import { Config as RedisConfig } from './Redis/Config'
 import { Acl } from './Acl'
 import { GitHubClient } from './GitHubClient'
 import { TelegramConfig } from "./TelegramConfig";
+import { HookHandler, IHookHandlerConfig } from "./HookHandler";
 
 const github = new GitHubClient();
+const dal = new Dal(config.get<RedisConfig>('redis'));
 const bot = new Bot(
-     github,
-     config.get<Acl>('acl'),
-     new Dal(config.get<RedisConfig>('redis')),
-     config.get<TelegramConfig>('telegram'));
+    github,
+    config.get<Acl>('acl'),
+    dal,
+    config.get<TelegramConfig>('telegram'));
+
+const handler = new HookHandler(config.get<IHookHandlerConfig>('webhook'), bot, dal);
 
 async function onSigTerm(reason: string, e?: any) : Promise<void> {
     await bot.sendFarewell(e ? `${reason}: ${e}` : reason);

@@ -88,7 +88,7 @@ export class Dal {
         return await this._client.zrank(this._getQueueKey(pr.repository), pr.id.toString());
     }
 
-    private _getPullRequestKey(repository: Repository, id: number) {
+    private _getPullRequestKey(repository: Repository, id: Number) {
         return `${repository}/${id}`;
     }
 
@@ -98,7 +98,7 @@ export class Dal {
             pullRequest.toHash());
     }
 
-    async getPullRequest(repository: Repository, id: number) {
+    async getPullRequest(repository: Repository, id: Number) {
         const hash = await this._client.hgetall(this._getPullRequestKey(repository, id));
         return PullRequest.fromHash(hash);
     }

@@ -3,7 +3,7 @@ import { Repository } from './Repository'
 import { PullRequest } from "./PullRequest";
 
 export interface IGitHubPullRequestHead {
-    sha1: string,
+    sha: string,
     ref: string
 }
 

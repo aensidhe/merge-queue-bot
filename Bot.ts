@@ -7,7 +7,6 @@ import {TelegramUser} from "./TelegramUser";
 import {Token} from "./Token";
 import {TelegramConfig} from "./TelegramConfig";
 import {PullRequest} from "./PullRequest";
-const githubPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
 
 class CommandOptions {
     readonly adminOnly : boolean;
@@ -22,11 +21,11 @@ class CommandOptions {
 class BotCommand {
     readonly isNew: Boolean;
     readonly options: CommandOptions;
-    readonly pattern : string;
+    readonly pattern : RegExp;
     readonly description : string;
     readonly handler : (msg: any, args: any) => Promise<void>;
 
-    constructor(pattern : string, description : string, handler : (msg: any, args: any) => Promise<void>, options: CommandOptions = new CommandOptions(false, false), isNew : Boolean = false) {
+    constructor(pattern : RegExp, description : string, handler : (msg: any, args: any) => Promise<void>, options: CommandOptions = new CommandOptions(false, false), isNew : Boolean = false) {
         this.pattern = pattern;
         this.description = description;
         this.handler = handler;
@@ -36,6 +35,8 @@ class BotCommand {
 }
 
 export class Bot {
+    public static readonly GitHubPRUrlPattern = 'https://github.com/(\\S+)/(\\S+)/pull/(\\d+)';
+
     private static readonly PrivateAdminCommand : CommandOptions = {
         adminOnly : true,
         privateOnly : true
@@ -66,7 +67,7 @@ export class Bot {
         // TypeScript and Javascript do not support named groups in RegExp, so unfortunately we need to repeat ourselves
         this._commands = [
             new BotCommand(
-                `/add ${githubPattern}`,
+                new RegExp(`/add ${Bot.GitHubPRUrlPattern}`),
                 `
 /add https://github.com/{owner}/{repo}/pull/{id}
 Adds PR to end of queue and reports it to queue chats.`,
@@ -74,7 +75,7 @@ Adds PR to end of queue and reports it to queue chats.`,
                 Bot.PrivateCommand),
 
             new BotCommand(
-                `/hotfix ${githubPattern}`,
+                new RegExp(`/hotfix ${Bot.GitHubPRUrlPattern}`),
                 `
 /hotfix https://github.com/{owner}/{repo}/pull/{id}
 Adds PR to head of queue. Reports it to queue chats and to previous leader, if any.`,
@@ -83,7 +84,7 @@ Adds PR to head of queue. Reports it to queue chats and to previous leader, if a
                 true),
 
             new BotCommand(
-                `/remove ${githubPattern}`,
+                new RegExp(`/remove ${Bot.GitHubPRUrlPattern}`),
                 `
 /remove https://github.com/{owner}/{repo}/pull/{id}
 Removes PR from queue. Reports it to queue chats and to new leader, if any.`,
@@ -91,14 +92,14 @@ Removes PR from queue. Reports it to queue chats and to new leader, if any.`,
                 Bot.PrivateCommand),
 
             new BotCommand(
-                "/queue",
+                /\/queue/,
                 `
 /queue
 Prints queue for this chat.`,
                 this.onQueueRequestHandler.bind(this)),
 
             new BotCommand(
-                "/add_token (\S+) (\S+)",
+                /\/add_token (\S+) (\S+)/,
                 `
 /add_token {token_name} {token}
 Adds github token to database.`,
@@ -106,7 +107,7 @@ Adds github token to database.`,
                 Bot.PrivateAdminCommand),
 
             new BotCommand(
-                "/remove_token (\S+)",
+                /\/remove_token (\S+)/,
                 `
 /remove_token {token_name}
 Removes github token from database.`,
@@ -114,7 +115,7 @@ Removes github token from database.`,
                 Bot.PrivateAdminCommand),
 
             new BotCommand(
-                "/map_token (\S+) (\S+)",
+                /\/map_token (\S+) (\S+)/,
                 `
 /map_token {owner} {token_name}
 Maps token_name to owner.`,
@@ -122,7 +123,7 @@ Maps token_name to owner.`,
                 Bot.PrivateAdminCommand),
 
             new BotCommand(
-                "/bind (\S+) (\S+)",
+                /\/bind (\S+) (\S+)/,
                 `
 /bind {owner} {repo}
 Bind this chat to owner/repo notification.`,
@@ -130,7 +131,7 @@ Bind this chat to owner/repo notification.`,
                 Bot.PublicAdminCommand),
 
             new BotCommand(
-                "/unbind (\S+) (\S+)",
+                /\/unbind (\S+) (\S+)/,
                 `
 /unbind {owner} {repo}
 Bind this chat to owner/repo notification.`,
@@ -138,7 +139,7 @@ Bind this chat to owner/repo notification.`,
                 Bot.PublicAdminCommand),
 
             new BotCommand(
-                "/ping",
+                /\/ping/,
                 `
 /ping
 Returns pong.`,
@@ -147,7 +148,7 @@ Returns pong.`,
                 true),
 
             new BotCommand(
-                "/help",
+                /\/help/,
                 `
 /help
 Returns help.`,
@@ -156,7 +157,7 @@ Returns help.`,
                 true),
 
             new BotCommand(
-                "/new",
+                /\/new/,
                 `
 /new
 Returns only new commands in this release.`,
@@ -182,7 +183,7 @@ Returns only new commands in this release.`,
         return false;
     }
 
-    private async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: number[]) {
+    private async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: Number[]) {
         let chats = new Set<string>(await this._redisDal.getBindedChats(repository));
 
         chatIds.forEach(x => chats.add(x.toString()));
@@ -198,7 +199,7 @@ Returns only new commands in this release.`,
         await this._sendToMultipleChats(message, Array.from(chats.values()));
     }
 
-    async _reportQueueToChat(repository : Repository, chatId : number) {
+    private async _reportQueueToChat(repository : Repository, chatId : Number) {
         const queue = await this._redisDal.getRepositoryQueue(repository);
         if (!queue || queue.length == 0)
         {
@@ -248,7 +249,7 @@ Returns only new commands in this release.`,
         }
     }
 
-    async _sendToMultipleChats(message : string, chatIds : Array<string>) {
+    private async _sendToMultipleChats(message : string, chatIds : Array<string>) {
         let outbox = new Array<Promise<void>>();
         for (let chatId of chatIds)
         {
@@ -261,7 +262,7 @@ Returns only new commands in this release.`,
         await Promise.all(outbox);
     }
 
-    async _getPullRequestFromArgs(msg, args) : Promise<PullRequest> {
+    private async _getPullRequestFromArgs(msg, args) : Promise<PullRequest> {
         const repository = new Repository(args[1], args[2]);
         const id = Number(args[3]);
 
@@ -285,13 +286,13 @@ Returns only new commands in this release.`,
         }
 
         if (index == 0) {
-            await this._gitHubClient.SetCommitSuccess(pr, githubPr.head.sha1, token);
+            await this._gitHubClient.SetCommitSuccess(pr, githubPr.head.sha, token);
         } else {
-            await this._gitHubClient.SetCommitPending(pr, githubPr.head.sha1, token);
+            await this._gitHubClient.SetCommitPending(pr, githubPr.head.sha, token);
         }
     }
 
-    async onAddPullRequest(msg, args) {
+    private async onAddPullRequest(msg, args) {
         const pr = await this._getPullRequestFromArgs(msg, args);
         await Promise.all([
             this._redisDal.savePullRequest(pr),
@@ -305,7 +306,7 @@ Returns only new commands in this release.`,
         await this._reportGithubStatus(pr);
     }
 
-    async onAddHotfixPullRequest(msg, args) {
+    private async onAddHotfixPullRequest(msg, args) {
         const pr = await this._getPullRequestFromArgs(msg, args);
 
         const results = await Promise.all([
@@ -333,10 +334,7 @@ Returns only new commands in this release.`,
         await this._reportGithubStatus(pr);
     }
 
-    async onRemovePullRequest(msg, args) {
-        const repository = new Repository(args[1], args[2]);
-        const id = Number(args[3]);
-
+    async removePullRequest(repository: Repository, id: Number, ...chatIds: Number[]) {
         const pr = await this._redisDal.getPullRequest(repository, id);
         if (!pr)
             throw { messageFromBot: 'PR not found' };
@@ -347,13 +345,13 @@ Returns only new commands in this release.`,
             await this._sendMessageToAllRepoChats(
                 repository,
                 `PR [#${pr.id}](${pr.url}) is removed from queue`,
-                msg.chat.id);
+                ...chatIds);
         }
         else {
             await this._sendMessageToAllRepoChats(
                 repository,
                 `PR [#${pr.id}](${pr.url}) is removed from queue`,
-                msg.chat.id,
+                ...chatIds,
                 pr.reporter.id);
         }
 
@@ -364,20 +362,27 @@ Returns only new commands in this release.`,
             await this._sendMessageToAllRepoChats(
                 repository,
                 'Queue is empty!',
-                msg.chat.id);
+                ...chatIds);
             return;
         }
 
         await this._sendMessageToAllRepoChats(
             repository,
             `PR [#${next_pr.id}](${next_pr.url}) by ${next_pr.reporter.getMention()} is next in queue!`,
-            msg.chat.id,
+            ...chatIds,
             next_pr.reporter.id);
 
         await this._reportGithubStatus(next_pr);
     }
 
-    async onQueueRequestHandler(msg, args) {
+    private async onRemovePullRequest(msg, args) {
+        const repository = new Repository(args[1], args[2]);
+        const id = Number(args[3]);
+
+        await this.removePullRequest(repository, id, msg.chat.id);
+    }
+
+    private async onQueueRequestHandler(msg, args) {
         let repositoriesToReport = await this._redisDal.getBindedRepositories(msg.chat.id);
         let reports = new Array<Promise<void>>();
         repositoriesToReport.forEach(repo => {
@@ -387,14 +392,14 @@ Returns only new commands in this release.`,
         await reports;
     }
 
-    async onAddTokenHandler(msg, args) {
+    private async onAddTokenHandler(msg, args) {
         await this._redisDal.saveToken(new Token(args[1], args[2]));
         await this._bot.sendMessage(
             msg.chat.id,
             `Token ${name} saved successfully.`);
     }
 
-    async onRemoveTokenHandler(msg, args) {
+    private async onRemoveTokenHandler(msg, args) {
         const name = args[1];
         await this._redisDal.deleteToken(name);
         await this._bot.sendMessage(
@@ -402,7 +407,7 @@ Returns only new commands in this release.`,
             `Token ${name} deleted successfully.`);
     }
 
-    async onMapTokenHandler(msg, args) {
+    private async onMapTokenHandler(msg, args) {
         const owner = args[1];
         const name = args[2];
         await this._redisDal.saveTokenMapping(name, owner);
@@ -411,7 +416,7 @@ Returns only new commands in this release.`,
             `Token ${name} will be used as an access to ${owner}`);
     }
 
-    async onBindRepoToChat(msg, args) {
+    private async onBindRepoToChat(msg, args) {
         const repository = new Repository(args[1], args[2]);
 
         await this._redisDal.saveChatBinding(msg.chat.id, repository);
@@ -421,7 +426,7 @@ Returns only new commands in this release.`,
             `This chat has been mapped to merge queue of ${repository}`);
     }
 
-    async onUnbindRepoToChat(msg, args) {
+    private async onUnbindRepoToChat(msg, args) {
         const repository = new Repository(args[1], args[2]);
 
         await this._redisDal.removeChatBinding(msg.chat.id, repository);
@@ -431,7 +436,7 @@ Returns only new commands in this release.`,
             `This chat has been unmapped from merge queue of ${repository}`);
     }
 
-    async onPing(msg, args) {
+    private async onPing(msg, args) {
         await this._bot.sendMessage(msg.chat.id, "Pong");
     }
 
@@ -460,11 +465,11 @@ Returns only new commands in this release.`,
         await this._bot.sendMessage(msg.chat.id, help);
     }
 
-    async onHelp(msg, args) {
+    private async onHelp(msg, args) {
         await this._printHelp(msg, _ => true);
     }
 
-    async onNewCommands(msg, args) {
+    private async onNewCommands(msg, args) {
         await this._printHelp(msg, x => x.isNew);
     }
 
