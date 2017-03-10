@@ -386,12 +386,8 @@ Returns only new commands in this release.`,
 
     private async onQueueRequestHandler(msg, args) {
         let repositoriesToReport = await this._redisDal.getBindedRepositories(msg.chat.id);
-        let reports = new Array<Promise<void>>();
-        repositoriesToReport.forEach(repo => {
-            reports.push(this._reportQueueToChat(repo, msg.chat.id));
-        });
 
-        await reports;
+        await Promise.all(repositoriesToReport.map(x => this._reportQueueToChat(x, msg.chat.id)));
     }
 
     private async onAddTokenHandler(msg, args) {
