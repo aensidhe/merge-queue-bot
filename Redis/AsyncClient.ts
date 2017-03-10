@@ -1,10 +1,9 @@
-import { RedisClient, ResCallbackT, createClient } from 'redis';
-import { Config } from './Config'
-import {Limits} from "./Limits";
+import { RedisClient, ResCallbackT, createClient, ClientOpts } from 'redis';
+import { Limits } from "./Limits";
 
 export class AsyncClient {
     private readonly _client : RedisClient;
-    constructor(redisConfig : Config) {
+    constructor(redisConfig : ClientOpts) {
         this._client = createClient(redisConfig);
     }
 

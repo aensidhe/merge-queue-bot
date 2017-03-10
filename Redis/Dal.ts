@@ -1,15 +1,15 @@
 import { AsyncClient } from './AsyncClient'
-import { Config } from './Config'
 import {Repository} from "../Repository";
 import {PullRequest} from "../PullRequest";
 import {Token} from "../Token";
 import { Limits } from "./Limits";
 import { IGithubCombinedStatus } from "../GitHubClient";
+import { ClientOpts } from "redis";
 
 export class Dal {
     private readonly _client : AsyncClient;
 
-    constructor(redisConfig: Config) {
+    constructor(redisConfig: ClientOpts) {
         this._client = new AsyncClient(redisConfig);
     }
 

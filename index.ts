@@ -1,10 +1,10 @@
 import * as config from 'config';
 import { Bot } from './Bot';
 import { Dal } from './Redis/Dal'
-import { Config as RedisConfig } from './Redis/Config'
-import { Acl } from './Acl'
+import { ClientOpts as RedisConfig } from 'redis'
+import { IAcl } from './IAcl'
 import { GitHubClient } from './GitHubClient'
-import { TelegramConfig } from "./TelegramConfig";
+import { ITelegramConfig } from "./ITelegramConfig";
 import { HookHandler, IHookHandlerConfig } from "./HookHandler";
 import { StatusUpdater, IStatusUpdaterConfig } from "./StatusUpdater";
 
@@ -12,9 +12,9 @@ const github = new GitHubClient();
 const dal = new Dal(config.get<RedisConfig>('redis'));
 const bot = new Bot(
     github,
-    config.get<Acl>('acl'),
+    config.get<IAcl>('acl'),
     dal,
-    config.get<TelegramConfig>('telegram'));
+    config.get<ITelegramConfig>('telegram'));
 
 const handler = new HookHandler(config.get<IHookHandlerConfig>('webhook'), bot, dal);
 const statusUpdater = new StatusUpdater(config.get<IStatusUpdaterConfig>('statusUpdater'), dal, github);

@@ -1,11 +1,11 @@
 import * as TelegramBot from 'node-telegram-bot-api'
 import { Dal } from './Redis/Dal'
-import { Acl } from './Acl'
+import { IAcl } from './IAcl'
 import { GitHubClient } from './GitHubClient'
 import {Repository} from "./Repository";
 import {TelegramUser} from "./TelegramUser";
 import {Token} from "./Token";
-import {TelegramConfig} from "./TelegramConfig";
+import {ITelegramConfig} from "./ITelegramConfig";
 import {PullRequest} from "./PullRequest";
 
 class CommandOptions {
@@ -51,13 +51,13 @@ export class Bot {
     };
 
     private readonly _commands : BotCommand[];
-    private readonly _acl : Acl;
+    private readonly _acl : IAcl;
     private readonly _gitHubClient: GitHubClient;
-    private readonly _telegramConfig : TelegramConfig;
+    private readonly _telegramConfig : ITelegramConfig;
     private readonly _redisDal : Dal;
     private readonly _bot : TelegramBot;
 
-    constructor(gitHubClient : GitHubClient, acl :Acl, redisDal : Dal, telegramConfig : TelegramConfig) {
+    constructor(gitHubClient : GitHubClient, acl :IAcl, redisDal : Dal, telegramConfig : ITelegramConfig) {
         this._acl = acl;
         this._gitHubClient = gitHubClient;
         this._telegramConfig = telegramConfig;
