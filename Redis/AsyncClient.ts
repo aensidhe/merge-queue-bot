@@ -82,4 +82,12 @@ export class AsyncClient {
     async smembers<T>(name: string) {
         return await AsyncClient.redisCall<T[]>(this._client.smembers.bind(this._client), name);
     }
+
+    async get(name: string) {
+        return await AsyncClient.redisCall<string>(this._client.get.bind(this._client), name);
+    }
+
+    async set(name: string, value: string) {
+        return await AsyncClient.redisCall<string>(this._client.set.bind(this._client), name, value);
+    }
 }

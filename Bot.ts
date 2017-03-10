@@ -211,7 +211,7 @@ Returns only new commands in this release.`,
         }
 
         let message = `Queue for ${repository}\n`;
-        queue.forEach(pr => message += `- [#${pr.id}](${pr.url}) by ${pr.reporter == null ? "pr.reporter is null": pr.reporter.getMention()}\n`);
+        queue.forEach(pr => message += `- [#${pr.id}](${pr.github.html_url}) by ${pr.reporter == null ? "pr.reporter is null": pr.reporter.getMention()}\n`);
 
         await this._bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     }
@@ -272,7 +272,7 @@ Returns only new commands in this release.`,
         const token = await this._redisDal.getGithubToken(repository);
         const githubPr = await this._gitHubClient.GetGithubPr(repository, id, token);
         const reporter = new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
-        return new PullRequest(repository, id, reporter, new Date(), githubPr.html_url, githubPr.head.ref);
+        return new PullRequest(repository, id, reporter, new Date(), githubPr);
     }
 
     async _reportGithubStatus(pr: PullRequest) {
@@ -302,7 +302,7 @@ Returns only new commands in this release.`,
 
         await this._sendMessageToAllRepoChats(
             pr.repository,
-            `PR [#${pr.id}](${pr.url}) is added to queue by ${pr.reporter.getMention()}`,
+            `PR [#${pr.id}](${pr.github.html_url}) is added to queue by ${pr.reporter.getMention()}`,
             msg.chat.id);
         await this._reportGithubStatus(pr);
     }
@@ -320,14 +320,14 @@ Returns only new commands in this release.`,
         {
             await this._sendMessageToAllRepoChats(
                 pr.repository,
-                `PR [#${pr.id}](${pr.url}) is a HOTFIX by ${pr.reporter.getMention()}`,
+                `PR [#${pr.id}](${pr.github.html_url}) is a HOTFIX by ${pr.reporter.getMention()}`,
                 msg.chat.id);
         }
         else
         {
             await this._sendMessageToAllRepoChats(
                 pr.repository,
-                `PR [#${pr.id}](${pr.url}) is a HOTFIX by ${pr.reporter.getMention()}`,
+                `PR [#${pr.id}](${pr.github.html_url}) is a HOTFIX by ${pr.reporter.getMention()}`,
                 msg.chat.id,
                 formerFirst.reporter.id);
         }
@@ -345,13 +345,13 @@ Returns only new commands in this release.`,
         if (pr.reporter == null) {
             await this._sendMessageToAllRepoChats(
                 repository,
-                `PR [#${pr.id}](${pr.url}) is removed from queue`,
+                `PR [#${pr.id}](${pr.github.html_url}) is removed from queue`,
                 ...chatIds);
         }
         else {
             await this._sendMessageToAllRepoChats(
                 repository,
-                `PR [#${pr.id}](${pr.url}) is removed from queue`,
+                `PR [#${pr.id}](${pr.github.html_url}) is removed from queue`,
                 ...chatIds,
                 pr.reporter.id);
         }
@@ -369,7 +369,7 @@ Returns only new commands in this release.`,
 
         await this._sendMessageToAllRepoChats(
             repository,
-            `PR [#${next_pr.id}](${next_pr.url}) by ${next_pr.reporter.getMention()} is next in queue!`,
+            `PR [#${next_pr.id}](${next_pr.github.html_url}) by ${next_pr.reporter.getMention()} is next in queue!`,
             ...chatIds,
             next_pr.reporter.id);
 
@@ -394,10 +394,11 @@ Returns only new commands in this release.`,
     }
 
     private async onAddTokenHandler(msg, args) {
-        await this._redisDal.saveToken(new Token(args[1], args[2]));
+        const token = new Token(args[1], args[2]);
+        await this._redisDal.saveToken(token);
         await this._bot.sendMessage(
             msg.chat.id,
-            `Token ${name} saved successfully.`);
+            `Token ${token.name} saved successfully.`);
     }
 
     private async onRemoveTokenHandler(msg, args) {

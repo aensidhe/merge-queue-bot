@@ -46,14 +46,14 @@ export class Dal {
         await this._client.zadd(
             this._getQueueKey(pullRequest.repository),
             pullRequest.id.toString(),
-            pullRequest.reportedTime.getTime());
+            pullRequest.reportedTime.valueOf());
     }
 
     async addHotfixToQueue(pullRequest: PullRequest) : Promise<PullRequest|null> {
         await this._client.zadd(
             this._getQueueKey(pullRequest.repository),
             pullRequest.id.toString(),
-            -pullRequest.reportedTime.getTime());
+            -pullRequest.reportedTime.valueOf());
         let ids = await this._client.zrangebyscore<number>(this._getQueueKey(pullRequest.repository));
         let next = false;
         for (let id of ids) {
@@ -127,7 +127,8 @@ export class Dal {
         await Promise.all([
             this._client.sadd(`repo_chats:${chatId}`, `${repository}`),
             this._client.sadd(`repo_chats:${repository}`, chatId.toString()),
-            this._client.sadd(`chats:binded`, chatId.toString())
+            this._client.sadd(`chats:binded`, chatId.toString()),
+            this._client.sadd(`repos:binded`, `${repository}`)
         ]);
     }
 
@@ -135,7 +136,8 @@ export class Dal {
         await Promise.all([
             this._client.srem(`repo_chats:${chatId}`, `${repository}`),
             this._client.srem(`repo_chats:${repository}`, chatId.toString()),
-            this._client.srem("chats:binded", chatId.toString())
+            this._client.srem("chats:binded", chatId.toString()),
+            this._client.srem("repos:binded", `${repository}`)
         ]);
     }
 
@@ -157,5 +159,49 @@ export class Dal {
 
     async getAllBindedChats() {
         return await this._client.smembers<string>("chats:binded");
+    }
+
+    async getAllBindedRepos() {
+        const strings = await this._client.smembers<string>("repos:binded");
+        const repos = Array<Repository>(strings.length);
+        for (let i = 0; i < strings.length; i++) {
+            const repo = Repository.parse(strings[i]);
+            if (repo == null) {
+                continue;
+            }
+
+            repos[i] = repo;
+        }
+
+        return repos;
+    }
+
+    private _getRequiredStatusesKey(repository: Repository, branch: string) {
+        return `${repository}:${branch}:requiredstatuses`;
+    }
+
+    private _getRequiredStatusesUpdatedKey(repository: Repository, branch: string) {
+        return `${repository}:${branch}:requiredstatuses:lastupdated`;
+    }
+
+    async getRequiredStatuses(repository: Repository, branch: string) : Promise<[string[], number]> {
+        const [statuses, time] = await Promise.all([
+            this._client.smembers<string>(this._getRequiredStatusesKey(repository, branch)),
+            this._client.get(this._getRequiredStatusesUpdatedKey(repository, branch))
+        ]);
+
+        return [statuses, Number(time)];
+    }
+
+    async setRequiredStatuses(repository: Repository, branch: string, statuses: string[]) {
+        const setKey = this._getRequiredStatusesKey(repository, branch);
+        await this._client.del(setKey);
+        let tasks = statuses.map(x => this._client.sadd(setKey, x));
+        tasks.push(this.touchRequiredStatuses(repository, branch));
+        await Promise.all(tasks);
+    }
+
+    async touchRequiredStatuses(repository: Repository, branch: string) {
+        await this._client.set(this._getRequiredStatusesUpdatedKey(repository, branch), new Date().valueOf().toString());
     }
 }
