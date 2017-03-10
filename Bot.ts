@@ -281,6 +281,7 @@ Returns only new commands in this release.`,
             this._redisDal.getGithubToken(pr.repository)
         ]);
         const githubPr = await this._gitHubClient.GetGithubPr(pr.repository, pr.id, token);
+        console.log(`_reportGithubStatus: Got github PR${githubPr.html_url}: ${githubPr.state}`)
         if (githubPr.state != "open") {
             return;
         }
