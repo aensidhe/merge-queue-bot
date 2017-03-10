@@ -19,13 +19,13 @@ class CommandOptions {
 }
 
 class BotCommand {
-    readonly isNew: Boolean;
+    readonly isNew: boolean;
     readonly options: CommandOptions;
     readonly pattern : RegExp;
     readonly description : string;
     readonly handler : (msg: any, args: any) => Promise<void>;
 
-    constructor(pattern : RegExp, description : string, handler : (msg: any, args: any) => Promise<void>, options: CommandOptions = new CommandOptions(false, false), isNew : Boolean = false) {
+    constructor(pattern : RegExp, description : string, handler : (msg: any, args: any) => Promise<void>, options: CommandOptions = new CommandOptions(false, false), isNew : boolean = false) {
         this.pattern = pattern;
         this.description = description;
         this.handler = handler;
@@ -183,7 +183,7 @@ Returns only new commands in this release.`,
         return false;
     }
 
-    private async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: Number[]) {
+    private async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: number[]) {
         let chats = new Set<string>(await this._redisDal.getBindedChats(repository));
 
         chatIds.forEach(x => chats.add(x.toString()));
@@ -199,7 +199,7 @@ Returns only new commands in this release.`,
         await this._sendToMultipleChats(message, Array.from(chats.values()));
     }
 
-    private async _reportQueueToChat(repository : Repository, chatId : Number) {
+    private async _reportQueueToChat(repository : Repository, chatId : number) {
         const queue = await this._redisDal.getRepositoryQueue(repository);
         if (!queue || queue.length == 0)
         {
@@ -335,7 +335,7 @@ Returns only new commands in this release.`,
         await this._reportGithubStatus(pr);
     }
 
-    async removePullRequest(repository: Repository, id: Number, ...chatIds: Number[]) {
+    async removePullRequest(repository: Repository, id: number, ...chatIds: number[]) {
         const pr = await this._redisDal.getPullRequest(repository, id);
         if (!pr)
             throw { messageFromBot: 'PR not found' };
@@ -441,7 +441,7 @@ Returns only new commands in this release.`,
         await this._bot.sendMessage(msg.chat.id, "Pong");
     }
 
-    private async _printHelp(msg, shouldPrint : (command: BotCommand) => Boolean) {
+    private async _printHelp(msg, shouldPrint : (command: BotCommand) => boolean) {
         const isAdmin = this._hasAdminAccess(msg);
         let help = "";
         for (let cmd of this._commands) {

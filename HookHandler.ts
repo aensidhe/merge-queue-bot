@@ -12,7 +12,7 @@ interface IPullRequestAction {
 }
 
 export interface IHookHandlerConfig {
-    port: Number
+    port: number
 }
 
 export class HookHandler {
@@ -41,7 +41,7 @@ export class HookHandler {
         this._redisDal = dal;
     }
 
-    private _parseUrl(url: string) : [Repository, Number] {
+    private _parseUrl(url: string) : [Repository, number] {
         let parseResult = this._urlParser.exec(url);
         if (parseResult == null) {
             throw { message: "Can't parse pr html_url" };
@@ -61,7 +61,7 @@ export class HookHandler {
         }
 
         const chats = await this._redisDal.getBindedChats(repo);
-        let chatIds: Array<Number> = [];
+        let chatIds: Array<number> = [];
         for (let chat of chats) {
             chatIds.push(Number(chat));
         }

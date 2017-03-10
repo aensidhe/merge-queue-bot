@@ -55,7 +55,7 @@ export class AsyncClient {
     }
 
     async zrank(name: string, member: string) {
-        return await AsyncClient.redisCall<Number|null>(this._client.zrank.bind(this._client), name, member);
+        return await AsyncClient.redisCall<number|null>(this._client.zrank.bind(this._client), name, member);
     }
 
     async zrangebyscore<T>(name: string, min?: number, max?: number, limitSettings?: Limits) {
