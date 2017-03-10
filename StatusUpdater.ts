@@ -71,6 +71,7 @@ export class StatusUpdater {
         const [actualPr, etag] = await this._github.GetGithubPr(pr.repository, pr.id, token, pr.etag);
         if (actualPr != null) {
             pr = new PullRequest(pr.repository, pr.id, pr.reporter, pr.reportedTime, actualPr, etag);
+            await this._dal.savePullRequest(pr);
         }
 
         const combinedStatus = await this._getCombinedStatus(pr, token);
@@ -92,10 +93,6 @@ export class StatusUpdater {
         if (pr.github.mergeable_state != "clean") {
             console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Mergeable state is ${pr.github.mergeable_state}.`);
             return;
-        }
-
-        if (actualPr != null) {
-            await this._dal.savePullRequest(pr);
         }
 
         const requiredStatuses = await this._getRequiredStatuses(pr.repository, pr.github.base.ref, token);
