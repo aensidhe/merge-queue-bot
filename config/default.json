@@ -20,7 +20,6 @@
         "timeoutMsec": 60000,
         "allowedBranches": [
             "develop"
-        ],
-        "protectedBranchesUpdateInterval": 86400000
+        ]
     }
 }

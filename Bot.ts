@@ -269,10 +269,18 @@ Returns only new commands in this release.`,
         if (!msg.from)
             throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
 
+        const pr = await this._redisDal.getPullRequest(repository, id);
         const token = await this._redisDal.getGithubToken(repository);
-        const githubPr = await this._gitHubClient.GetGithubPr(repository, id, token);
+        const [githubPr, etag] = await this._gitHubClient.GetGithubPr(repository, id, token, pr == null ? null : pr.etag);
+        if (githubPr == null) {
+            if (pr == null) {
+                throw new Error("Our pr is null and github pr is null. Something went wrong");
+            }
+
+            return pr;
+        }
         const reporter = new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
-        return new PullRequest(repository, id, reporter, new Date(), githubPr);
+        return new PullRequest(repository, id, reporter, new Date(), githubPr, etag);
     }
 
     async _reportGithubStatus(pr: PullRequest) {
@@ -280,8 +288,12 @@ Returns only new commands in this release.`,
             this._redisDal.getPullRequestIndex(pr),
             this._redisDal.getGithubToken(pr.repository)
         ]);
-        const githubPr = await this._gitHubClient.GetGithubPr(pr.repository, pr.id, token);
-        console.log(`_reportGithubStatus: Got github PR${githubPr.html_url}: ${githubPr.state}`)
+        let [githubPr, etag] = await this._gitHubClient.GetGithubPr(pr.repository, pr.id, token, pr.etag);
+        if (githubPr == null) {
+            githubPr = pr.github
+        }
+
+        console.log(`_reportGithubStatus: Got github PR${pr.id}: ${githubPr.state}`)
         if (githubPr.state != "open") {
             return;
         }

@@ -6,7 +6,6 @@ import { Repository } from "./Repository";
 export interface IStatusUpdaterConfig {
     timeoutMsec : number,
     allowedBranches: string[],
-    protectedBranchesUpdateInterval : number
 }
 
 export class StatusUpdater {
@@ -69,34 +68,37 @@ export class StatusUpdater {
             return;
         }
 
-        const combinedStatus = await this._github.GetCombinedStatus(pr, token);
+        const [actualPr, etag] = await this._github.GetGithubPr(pr.repository, pr.id, token, pr.etag);
+        if (actualPr != null) {
+            pr = new PullRequest(pr.repository, pr.id, pr.reporter, pr.reportedTime, actualPr, etag);
+        }
+
+        const combinedStatus = await this._getCombinedStatus(pr, token);
         if (combinedStatus.state != "success") {
             console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Combined status is ${combinedStatus.state}.`);
             return;
         }
 
-        const actualPr = await this._github.GetGithubPr(pr.repository, pr.id, token);
-        if (actualPr.state != "open") {
-            console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. PR state is ${actualPr.state}.`);
+        if (pr.github.state != "open") {
+            console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. PR state is ${pr.github.state}.`);
             return;
         }
 
-        if (!actualPr.mergeable) {
+        if (!pr.github.mergeable) {
             console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. PR is not mergeable.`);
             return;
         }
 
-        if (actualPr.mergeable_state != "clean") {
-            console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Mergeable state is ${actualPr.mergeable_state}.`);
+        if (pr.github.mergeable_state != "clean") {
+            console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Mergeable state is ${pr.github.mergeable_state}.`);
             return;
         }
 
-        if (pr.github.head.sha != actualPr.head.sha || pr.github.base.ref != actualPr.base.ref) {
-            pr.github = actualPr;
+        if (actualPr != null) {
             await this._dal.savePullRequest(pr);
         }
 
-        const requiredStatuses = await this._getRequiredStatuses(pr.repository, actualPr.base.ref, token);
+        const requiredStatuses = await this._getRequiredStatuses(pr.repository, pr.github.base.ref, token);
         const actualStatuses = combinedStatus.statuses
             .filter(x => x.state == "success")
             .map(x => x.context)
@@ -112,11 +114,7 @@ export class StatusUpdater {
     }
 
     private async _getRequiredStatuses(repository: Repository, branch: string, token: string) {
-        const [statuses, lastUpdated] = await this._dal.getRequiredStatuses(repository, branch);
-
-        if (statuses != null && new Date().valueOf() - lastUpdated < this._config.protectedBranchesUpdateInterval) {
-            return statuses;
-        }
+        const [statuses, etag] = await this._dal.getRequiredStatuses(repository, branch);
 
         if (statuses == null) {
             console.log(`StatusUpdater: downloading required statuses from github for ${repository}.`);
@@ -125,14 +123,40 @@ export class StatusUpdater {
             console.log(`StatusUpdater: updating required statuses from github for ${repository}.`);
         }
 
-        const newStatuses = await this._github.GetRequiredStatuses(repository, branch, token);
-        if (this._statusesEqual(statuses, newStatuses)) {
-            await this._dal.touchRequiredStatuses(repository, branch);
-        } else {
-            await this._dal.setRequiredStatuses(repository, branch, newStatuses);
+        const [newStatuses, newEtag] = await this._github.GetRequiredStatuses(repository, branch, token, etag);
+        if (newEtag != etag) {
+            await this._dal.setRequiredStatuses(repository, branch, newStatuses, newEtag);
+            return newStatuses;
         }
 
-        return newStatuses;
+        return statuses;
+    }
+
+    private async _getCombinedStatus(pr: PullRequest, token: string) {
+        const [status, etag] = await this._dal.getCombinedStatus(pr);
+
+        if (status == null) {
+            console.log(`StatusUpdater: downloading combined status from github for ${pr.repository}/${pr.id}.`);
+        }
+        else {
+            console.log(`StatusUpdater: updating required statuses from github for ${pr.repository}/${pr.id}.`);
+        }
+
+        const [newStatus, newEtag] = await this._github.GetCombinedStatus(pr, token, etag);
+        if (etag != newEtag) {
+            if (newStatus == null) {
+                throw new Error(`Github returns null and new etag, can't be. ${pr.repository}/${pr.id}`);
+            }
+
+            await this._dal.setCombinedStatus(pr, newStatus, newEtag);
+            return newStatus;
+        }
+
+        if (status == null) {
+            throw new Error(`Our status is null, github status is null. ${pr.repository}/${pr.id}`);
+        }
+
+        return status;
     }
 
     private _statusesEqual(oldStatuses: string[], newStatuses: string[]) : boolean {

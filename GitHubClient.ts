@@ -27,8 +27,8 @@ export interface IGithubCombinedStatus {
 }
 
 export class GitHubClient {
-    private _getOptions(token: string, usePreviewApi: boolean = false): WebRequest.RequestOptions {
-        return {
+    private _getOptions(token: string, etag: string|null = null, usePreviewApi: boolean = false): WebRequest.RequestOptions {
+        let options = {
             headers: {
                 'user-agent': 'Merge queue telegram bot',
                 'Authorization': `token ${token}`,
@@ -37,34 +37,56 @@ export class GitHubClient {
                     : 'application/vnd.github.v3+json'
             }
         };
+
+        if (etag != null) {
+            options.headers["If-None-Match"] = etag;
+        }
+
+        return options;
     }
 
-    public async GetGithubPr(repository: Repository, id: number, token: string): Promise<IGitHubPullRequest> {
+    public async GetGithubPr(repository: Repository, id: number, token: string, etag: string|null): Promise<[IGitHubPullRequest|null, string]> {
         const response = await WebRequest.get(
             `https://api.github.com/repos/${repository}/pulls/${id}`,
-            this._getOptions(token)
+            this._getOptions(token, etag)
         );
 
         console.log(`Got PR#${id} from github. Status code is ${response.statusCode}: ${response.statusMessage}.`);
 
+        if (response.statusCode == 304) {
+            if (etag == null) {
+                throw new Error("Etag is null and got 304. This can't be.");
+            }
+
+            return [null, etag]
+        }
+
         if (response.statusCode != 200)
             throw new Error("Not 200 code in response");
 
-        return JSON.parse(response.content);
+        return [JSON.parse(response.content), response.headers["etag"]];
     }
 
-    public async GetCombinedStatus(pr: PullRequest, token: string): Promise<IGithubCombinedStatus> {
+    public async GetCombinedStatus(pr: PullRequest, token: string, etag: string|null): Promise<[IGithubCombinedStatus|null, string]> {
         const response = await WebRequest.get(
             `https://api.github.com/repos/${pr.repository}/commits/${pr.github.head.ref}/status`,
-            this._getOptions(token)
+            this._getOptions(token, etag)
         );
 
         console.log(`Got statuses for PR#${pr.id} from github. Status code is ${response.statusCode}: ${response.statusMessage}.`);
 
+        if (response.statusCode == 304) {
+            if (etag == null) {
+                throw new Error("Etag is null and got 304. This can't be.");
+            }
+
+            return [null, etag]
+        }
+
         if (response.statusCode != 200)
             throw new Error("Not 200 code in response");
 
-        return JSON.parse(response.content);
+        return [JSON.parse(response.content), response.headers["etag"]];
     }
 
     public async SetCommitSuccess(pr: PullRequest, sha1: string, token: string) : Promise<void> {
@@ -101,24 +123,29 @@ export class GitHubClient {
             throw new Error("Not 200 code in response");
     }
 
-    public async GetRequiredStatuses(repo: Repository, branch: string, token: string) : Promise<string[]> {
+    public async GetRequiredStatuses(repo: Repository, branch: string, token: string, etag: string|null) : Promise<[string[], string]> {
         const response = await WebRequest.get(
             `https://api.github.com/repos/${repo}/branches/${branch}/protection/required_status_checks/contexts`,
-            this._getOptions(token, true)
+            this._getOptions(token, etag, true)
         );
 
         console.log(`Got required statuses for repo ${repo} from github. Status code is ${response.statusCode}: ${response.statusMessage}.`);
 
-        if (response.statusCode != 200)
-            return []
+        if (response.statusCode == 200) {
+            return [JSON.parse(response.content), response.headers["etag"]];
+        }
 
-        return JSON.parse(response.content);
+        if (response.statusCode == 304) {
+            return [[], response.headers["etag"]];
+        }
+
+        throw new Error(`Some error in github client: ${response.statusCode}`);
     }
 
     public async MergePullRequest(pr: PullRequest, token: string) {
         let response = await WebRequest.put(
             `https://api.github.com/repos/${pr.repository}/pulls/${pr.id}/merge`,
-            this._getOptions(token, true),
+            this._getOptions(token, null, true),
             JSON.stringify({
                 "commit_title": `Automatic merge by queue-bot of PR#${pr.id} (${pr.github.head.ref})`,
                 "commit_message": `Merged by evote-queue-bot.

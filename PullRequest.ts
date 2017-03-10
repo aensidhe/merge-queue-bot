@@ -3,17 +3,19 @@ import { TelegramUser } from "./TelegramUser";
 import { IGitHubPullRequest } from "./GitHubClient";
 
 export class PullRequest {
-    constructor(repository: Repository, id: number, reporter: TelegramUser, reportedTime: Date, github: IGitHubPullRequest) {
+    constructor(repository: Repository, id: number, reporter: TelegramUser, reportedTime: Date, github: IGitHubPullRequest, etag: string) {
         this.repository = repository;
         this.reporter = reporter;
         this.id = id;
         this.reportedTime = reportedTime;
         this.github = github;
+        this.etag = etag;
     }
 
     readonly repository : Repository;
     readonly reporter : TelegramUser;
     readonly id : number;
+    readonly etag : string;
     readonly reportedTime : Date;
     github : IGitHubPullRequest;
 
@@ -22,6 +24,7 @@ export class PullRequest {
         let result = hash || new Map<string, any>();
 
         result[`${actualPrefix}.id`] = this.id;
+        result[`${actualPrefix}.etag`] = this.etag == null? "" : this.etag;
         result[`${actualPrefix}.github`] = JSON.stringify(this.github);
         result[`${actualPrefix}.reportedTime`] = this.reportedTime.valueOf();
 
@@ -47,6 +50,7 @@ export class PullRequest {
         const actualPrefix = PullRequest._getPrefix(prefix);
 
         const id = hash[`${actualPrefix}.id`];
+        const etag = hash[`${actualPrefix}.etag`];
         const github = JSON.parse(hash[`${actualPrefix}.github`]);
         const time = new Date(Number(hash[`${actualPrefix}.reportedTime`]));
 
@@ -69,7 +73,8 @@ export class PullRequest {
             id,
             reporter,
             time,
-            github
+            github,
+            etag
         );
     }
 }
