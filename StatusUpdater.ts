@@ -44,14 +44,9 @@ export class StatusUpdater {
             return;
         }
 
-        const queueGetters = Array<Promise<PullRequest[]>>(repos.length);
+        const queues = await Promise.all(repos.map(x => this._dal.getRepositoryQueue(x)));
         for (let i = 0; i < repos.length; i++) {
-             queueGetters[i] = this._dal.getRepositoryQueue(repos[i]);
-        }
-
-        const queues = await Promise.all(queueGetters);
-        for (let i = 0; i < repos.length; i++) {
-            const queue = await this._dal.getRepositoryQueue(repos[i])
+            const queue = queues[i];
             if (queue.length == 0) {
                 console.log(`StatusUpdater: queue for ${repos[i]} is empty.`);
                 continue;

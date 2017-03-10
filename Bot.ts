@@ -175,12 +175,7 @@ Returns only new commands in this release.`,
     }
 
     private _hasAdminAccess(msg) {
-        for (let i = 0; i < this._acl['su'].length; i++) {
-            if (this._acl['su'][i] == msg.from.id)
-                return true;
-        }
-
-        return false;
+        return this._acl.su.some(x => x == msg.from.id);
     }
 
     private async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: number[]) {
@@ -250,16 +245,10 @@ Returns only new commands in this release.`,
     }
 
     private async _sendToMultipleChats(message : string, chatIds : Array<string>) {
-        let outbox = new Array<Promise<void>>();
-        for (let chatId of chatIds)
-        {
-            outbox.push(this._bot.sendMessage(
-                chatId,
-                message,
-                { parse_mode: 'Markdown' }));
-        }
-
-        await Promise.all(outbox);
+        await Promise.all(chatIds.map(x => this._bot.sendMessage(
+            x,
+            message,
+            { parse_mode: 'Markdown' })));
     }
 
     private async _getPullRequestFromArgs(msg, args) : Promise<PullRequest> {

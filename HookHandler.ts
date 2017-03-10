@@ -61,12 +61,7 @@ export class HookHandler {
         }
 
         const chats = await this._redisDal.getBindedChats(repo);
-        let chatIds: Array<number> = [];
-        for (let chat of chats) {
-            chatIds.push(Number(chat));
-        }
-
-        await this._bot.removePullRequest(repo, id, ...chatIds);
+        await this._bot.removePullRequest(repo, id, ...chats.map(x => Number(x)));
         res.sendStatus(200);
     }
 }

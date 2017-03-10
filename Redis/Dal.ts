@@ -27,12 +27,9 @@ export class Dal {
 
     async getRepositoryQueue(repository: Repository) : Promise<PullRequest[]> {
         let ids = await this._client.zrangebyscore<number>(this._getQueueKey(repository));
-        let promises = new Array<Promise<PullRequest|null>>();
-        for (let id of ids) {
-            promises.push(this.getPullRequest(repository, id));
-        }
-
+        let promises = ids.map(x => this.getPullRequest(repository, x));
         let prs = await Promise.all(promises);
+
         let result = new Array<PullRequest>();
         for (let pr of prs) {
             if (pr != null) {
