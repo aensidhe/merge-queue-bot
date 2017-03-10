@@ -1,31 +1,32 @@
 import {Repository} from "./Repository";
-import {TelegramUser} from "./TelegramUser";
+import { TelegramUser } from "./TelegramUser";
+import { IGitHubPullRequest } from "./GitHubClient";
 
 export class PullRequest {
-    constructor(repository: Repository, id: number, reporter: TelegramUser, reportedTime: Date, url: string, branch: string) {
+    constructor(repository: Repository, id: number, reporter: TelegramUser, reportedTime: Date, github: IGitHubPullRequest, etag: string) {
         this.repository = repository;
         this.reporter = reporter;
         this.id = id;
         this.reportedTime = reportedTime;
-        this.url = url;
-        this.branch = branch;
+        this.github = github;
+        this.etag = etag;
     }
 
     readonly repository : Repository;
     readonly reporter : TelegramUser;
     readonly id : number;
+    readonly etag : string;
     readonly reportedTime : Date;
-    readonly url : string;
-    readonly branch : string;
+    github : IGitHubPullRequest;
 
     toHash(hash?: Map<string, any>, prefix?: string) : Map<string, any> {
         const actualPrefix = PullRequest._getPrefix(prefix);
         let result = hash || new Map<string, any>();
 
         result[`${actualPrefix}.id`] = this.id;
-        result[`${actualPrefix}.url`] = this.url;
-        result[`${actualPrefix}.branch`] = this.branch;
-        result[`${actualPrefix}.reportedTime`] = this.reportedTime.getTime();
+        result[`${actualPrefix}.etag`] = this.etag == null? "" : this.etag;
+        result[`${actualPrefix}.github`] = JSON.stringify(this.github);
+        result[`${actualPrefix}.reportedTime`] = this.reportedTime.valueOf();
 
         if (this.reporter) {
             this.reporter.toHash(result, `${actualPrefix}.reporter`);
@@ -48,10 +49,10 @@ export class PullRequest {
 
         const actualPrefix = PullRequest._getPrefix(prefix);
 
-        const id = hash['pullRequest.id'];
-        const url = hash['pullRequest.url'];
-        const branch = hash['pullRequest.branch'];
-        const time = new Date(hash['pullRequest.reportedTime']);
+        const id = hash[`${actualPrefix}.id`];
+        const etag = hash[`${actualPrefix}.etag`];
+        const github = JSON.parse(hash[`${actualPrefix}.github`]);
+        const time = new Date(Number(hash[`${actualPrefix}.reportedTime`]));
 
         if (!id || !time) {
             return null;
@@ -72,8 +73,8 @@ export class PullRequest {
             id,
             reporter,
             time,
-            url,
-            branch
+            github,
+            etag
         );
     }
 }

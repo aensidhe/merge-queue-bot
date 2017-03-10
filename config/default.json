@@ -15,5 +15,11 @@
     },
     "webhook": {
         "port": 4387
+    },
+    "statusUpdater": {
+        "timeoutMsec": 60000,
+        "allowedBranches": [
+            "develop"
+        ]
     }
 }

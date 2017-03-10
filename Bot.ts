@@ -19,13 +19,13 @@ class CommandOptions {
 }
 
 class BotCommand {
-    readonly isNew: Boolean;
+    readonly isNew: boolean;
     readonly options: CommandOptions;
     readonly pattern : RegExp;
     readonly description : string;
     readonly handler : (msg: any, args: any) => Promise<void>;
 
-    constructor(pattern : RegExp, description : string, handler : (msg: any, args: any) => Promise<void>, options: CommandOptions = new CommandOptions(false, false), isNew : Boolean = false) {
+    constructor(pattern : RegExp, description : string, handler : (msg: any, args: any) => Promise<void>, options: CommandOptions = new CommandOptions(false, false), isNew : boolean = false) {
         this.pattern = pattern;
         this.description = description;
         this.handler = handler;
@@ -183,7 +183,7 @@ Returns only new commands in this release.`,
         return false;
     }
 
-    private async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: Number[]) {
+    private async _sendMessageToAllRepoChats(repository : Repository, message : string, ...chatIds: number[]) {
         let chats = new Set<string>(await this._redisDal.getBindedChats(repository));
 
         chatIds.forEach(x => chats.add(x.toString()));
@@ -199,7 +199,7 @@ Returns only new commands in this release.`,
         await this._sendToMultipleChats(message, Array.from(chats.values()));
     }
 
-    private async _reportQueueToChat(repository : Repository, chatId : Number) {
+    private async _reportQueueToChat(repository : Repository, chatId : number) {
         const queue = await this._redisDal.getRepositoryQueue(repository);
         if (!queue || queue.length == 0)
         {
@@ -211,7 +211,7 @@ Returns only new commands in this release.`,
         }
 
         let message = `Queue for ${repository}\n`;
-        queue.forEach(pr => message += `- [#${pr.id}](${pr.url}) by ${pr.reporter == null ? "pr.reporter is null": pr.reporter.getMention()}\n`);
+        queue.forEach(pr => message += `- [#${pr.id}](${pr.github.html_url}) by ${pr.reporter == null ? "pr.reporter is null": pr.reporter.getMention()}\n`);
 
         await this._bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     }
@@ -269,10 +269,18 @@ Returns only new commands in this release.`,
         if (!msg.from)
             throw { messageFromBot: "msg.user is empty. Can't process your pull request, sorry." };
 
+        const pr = await this._redisDal.getPullRequest(repository, id);
         const token = await this._redisDal.getGithubToken(repository);
-        const githubPr = await this._gitHubClient.GetGithubPr(repository, id, token);
+        const [githubPr, etag] = await this._gitHubClient.GetGithubPr(repository, id, token, pr == null ? null : pr.etag);
+        if (githubPr == null) {
+            if (pr == null) {
+                throw new Error("Our pr is null and github pr is null. Something went wrong");
+            }
+
+            return pr;
+        }
         const reporter = new TelegramUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
-        return new PullRequest(repository, id, reporter, new Date(), githubPr.html_url, githubPr.head.ref);
+        return new PullRequest(repository, id, reporter, new Date(), githubPr, etag);
     }
 
     async _reportGithubStatus(pr: PullRequest) {
@@ -280,8 +288,12 @@ Returns only new commands in this release.`,
             this._redisDal.getPullRequestIndex(pr),
             this._redisDal.getGithubToken(pr.repository)
         ]);
-        const githubPr = await this._gitHubClient.GetGithubPr(pr.repository, pr.id, token);
-        console.log(`_reportGithubStatus: Got github PR${githubPr.html_url}: ${githubPr.state}`)
+        let [githubPr, etag] = await this._gitHubClient.GetGithubPr(pr.repository, pr.id, token, pr.etag);
+        if (githubPr == null) {
+            githubPr = pr.github
+        }
+
+        console.log(`_reportGithubStatus: Got github PR${pr.id}: ${githubPr.state}`)
         if (githubPr.state != "open") {
             return;
         }
@@ -302,7 +314,7 @@ Returns only new commands in this release.`,
 
         await this._sendMessageToAllRepoChats(
             pr.repository,
-            `PR [#${pr.id}](${pr.url}) is added to queue by ${pr.reporter.getMention()}`,
+            `PR [#${pr.id}](${pr.github.html_url}) is added to queue by ${pr.reporter.getMention()}`,
             msg.chat.id);
         await this._reportGithubStatus(pr);
     }
@@ -320,14 +332,14 @@ Returns only new commands in this release.`,
         {
             await this._sendMessageToAllRepoChats(
                 pr.repository,
-                `PR [#${pr.id}](${pr.url}) is a HOTFIX by ${pr.reporter.getMention()}`,
+                `PR [#${pr.id}](${pr.github.html_url}) is a HOTFIX by ${pr.reporter.getMention()}`,
                 msg.chat.id);
         }
         else
         {
             await this._sendMessageToAllRepoChats(
                 pr.repository,
-                `PR [#${pr.id}](${pr.url}) is a HOTFIX by ${pr.reporter.getMention()}`,
+                `PR [#${pr.id}](${pr.github.html_url}) is a HOTFIX by ${pr.reporter.getMention()}`,
                 msg.chat.id,
                 formerFirst.reporter.id);
         }
@@ -335,7 +347,7 @@ Returns only new commands in this release.`,
         await this._reportGithubStatus(pr);
     }
 
-    async removePullRequest(repository: Repository, id: Number, ...chatIds: Number[]) {
+    async removePullRequest(repository: Repository, id: number, ...chatIds: number[]) {
         const pr = await this._redisDal.getPullRequest(repository, id);
         if (!pr)
             throw { messageFromBot: 'PR not found' };
@@ -345,13 +357,13 @@ Returns only new commands in this release.`,
         if (pr.reporter == null) {
             await this._sendMessageToAllRepoChats(
                 repository,
-                `PR [#${pr.id}](${pr.url}) is removed from queue`,
+                `PR [#${pr.id}](${pr.github.html_url}) is removed from queue`,
                 ...chatIds);
         }
         else {
             await this._sendMessageToAllRepoChats(
                 repository,
-                `PR [#${pr.id}](${pr.url}) is removed from queue`,
+                `PR [#${pr.id}](${pr.github.html_url}) is removed from queue`,
                 ...chatIds,
                 pr.reporter.id);
         }
@@ -369,7 +381,7 @@ Returns only new commands in this release.`,
 
         await this._sendMessageToAllRepoChats(
             repository,
-            `PR [#${next_pr.id}](${next_pr.url}) by ${next_pr.reporter.getMention()} is next in queue!`,
+            `PR [#${next_pr.id}](${next_pr.github.html_url}) by ${next_pr.reporter.getMention()} is next in queue!`,
             ...chatIds,
             next_pr.reporter.id);
 
@@ -394,10 +406,11 @@ Returns only new commands in this release.`,
     }
 
     private async onAddTokenHandler(msg, args) {
-        await this._redisDal.saveToken(new Token(args[1], args[2]));
+        const token = new Token(args[1], args[2]);
+        await this._redisDal.saveToken(token);
         await this._bot.sendMessage(
             msg.chat.id,
-            `Token ${name} saved successfully.`);
+            `Token ${token.name} saved successfully.`);
     }
 
     private async onRemoveTokenHandler(msg, args) {
@@ -441,7 +454,7 @@ Returns only new commands in this release.`,
         await this._bot.sendMessage(msg.chat.id, "Pong");
     }
 
-    private async _printHelp(msg, shouldPrint : (command: BotCommand) => Boolean) {
+    private async _printHelp(msg, shouldPrint : (command: BotCommand) => boolean) {
         const isAdmin = this._hasAdminAccess(msg);
         let help = "";
         for (let cmd of this._commands) {

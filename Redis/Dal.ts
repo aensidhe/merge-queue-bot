@@ -3,7 +3,8 @@ import { Config } from './Config'
 import {Repository} from "../Repository";
 import {PullRequest} from "../PullRequest";
 import {Token} from "../Token";
-import {Limits} from "./Limits";
+import { Limits } from "./Limits";
+import { IGithubCombinedStatus } from "../GitHubClient";
 
 export class Dal {
     private readonly _client : AsyncClient;
@@ -46,14 +47,14 @@ export class Dal {
         await this._client.zadd(
             this._getQueueKey(pullRequest.repository),
             pullRequest.id.toString(),
-            pullRequest.reportedTime.getTime());
+            pullRequest.reportedTime.valueOf());
     }
 
     async addHotfixToQueue(pullRequest: PullRequest) : Promise<PullRequest|null> {
         await this._client.zadd(
             this._getQueueKey(pullRequest.repository),
             pullRequest.id.toString(),
-            -pullRequest.reportedTime.getTime());
+            -pullRequest.reportedTime.valueOf());
         let ids = await this._client.zrangebyscore<number>(this._getQueueKey(pullRequest.repository));
         let next = false;
         for (let id of ids) {
@@ -88,7 +89,7 @@ export class Dal {
         return await this._client.zrank(this._getQueueKey(pr.repository), pr.id.toString());
     }
 
-    private _getPullRequestKey(repository: Repository, id: Number) {
+    private _getPullRequestKey(repository: Repository, id: number) {
         return `${repository}/${id}`;
     }
 
@@ -98,7 +99,7 @@ export class Dal {
             pullRequest.toHash());
     }
 
-    async getPullRequest(repository: Repository, id: Number) {
+    async getPullRequest(repository: Repository, id: number) {
         const hash = await this._client.hgetall(this._getPullRequestKey(repository, id));
         return PullRequest.fromHash(hash);
     }
@@ -127,7 +128,8 @@ export class Dal {
         await Promise.all([
             this._client.sadd(`repo_chats:${chatId}`, `${repository}`),
             this._client.sadd(`repo_chats:${repository}`, chatId.toString()),
-            this._client.sadd(`chats:binded`, chatId.toString())
+            this._client.sadd(`chats:binded`, chatId.toString()),
+            this._client.sadd(`repos:binded`, `${repository}`)
         ]);
     }
 
@@ -135,7 +137,8 @@ export class Dal {
         await Promise.all([
             this._client.srem(`repo_chats:${chatId}`, `${repository}`),
             this._client.srem(`repo_chats:${repository}`, chatId.toString()),
-            this._client.srem("chats:binded", chatId.toString())
+            this._client.srem("chats:binded", chatId.toString()),
+            this._client.srem("repos:binded", `${repository}`)
         ]);
     }
 
@@ -157,5 +160,80 @@ export class Dal {
 
     async getAllBindedChats() {
         return await this._client.smembers<string>("chats:binded");
+    }
+
+    async getAllBindedRepos() {
+        const strings = await this._client.smembers<string>("repos:binded");
+        const repos = Array<Repository>(strings.length);
+        for (let i = 0; i < strings.length; i++) {
+            const repo = Repository.parse(strings[i]);
+            if (repo == null) {
+                continue;
+            }
+
+            repos[i] = repo;
+        }
+
+        return repos;
+    }
+
+    private _getRequiredStatusesKey(repository: Repository, branch: string) {
+        return `${repository}:${branch}:requiredstatuses`;
+    }
+
+    private _getRequiredStatusesUpdatedKey(repository: Repository, branch: string) {
+        return `${repository}:${branch}:requiredstatuses:lastupdated`;
+    }
+
+    private _getRequiredStatusesEtagKey(repository: Repository, branch: string) {
+        return `${repository}:${branch}:requiredstatuses:etag`;
+    }
+
+    async getRequiredStatuses(repository: Repository, branch: string) : Promise<[string[], string]> {
+        const [statuses, etag] = await Promise.all([
+            this._client.smembers<string>(this._getRequiredStatusesKey(repository, branch)),
+            this._client.get(this._getRequiredStatusesEtagKey(repository, branch))
+        ]);
+
+        return [statuses, etag];
+    }
+
+    async setRequiredStatuses(repository: Repository, branch: string, statuses: string[], etag: string) {
+        const setKey = this._getRequiredStatusesKey(repository, branch);
+        await this._client.del(setKey);
+        let tasks = statuses.map(x => this._client.sadd(setKey, x));
+        tasks.push(this.touchRequiredStatuses(repository, branch, etag));
+        await Promise.all(tasks);
+    }
+
+    async touchRequiredStatuses(repository: Repository, branch: string, etag: string) {
+        await Promise.all([
+            this._client.set(this._getRequiredStatusesUpdatedKey(repository, branch), new Date().valueOf().toString()),
+            this._client.set(this._getRequiredStatusesEtagKey(repository, branch), etag)
+        ]);
+    }
+
+    private _getCombinedStatusKey(pr: PullRequest) {
+        return `${this._getPullRequestKey(pr.repository, pr.id)}:combinedstatus`;
+    }
+
+    private _getCombinedStatusEtagKey(pr: PullRequest) {
+        return `${this._getPullRequestKey(pr.repository, pr.id)}:combinedstatus:etag`;
+    }
+
+    async getCombinedStatus(pr: PullRequest) : Promise<[IGithubCombinedStatus|null, string]> {
+        const [status, etag] = await Promise.all([
+            this._client.get(this._getCombinedStatusKey(pr)),
+            this._client.get(this._getCombinedStatusEtagKey(pr))
+        ]);
+
+        return [status == "" ? null : JSON.parse(status), etag];
+    }
+
+    async setCombinedStatus(pr: PullRequest, status: IGithubCombinedStatus, etag: string) {
+        await Promise.all([
+            this._client.set(this._getCombinedStatusKey(pr), JSON.stringify(status)),
+            this._client.set(this._getCombinedStatusEtagKey(pr), etag)
+        ]);
     }
 }
