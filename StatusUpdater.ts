@@ -97,7 +97,9 @@ export class StatusUpdater {
             .sort();
 
         if (!this._statusesEqual(actualStatuses, requiredStatuses)) {
-            console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Not all checks are good.`);
+            console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Not all checks are good.
+    ActualStatuses: ${actualStatuses.join(', ')}.
+    RequiredStatuses: ${requiredStatuses.join(', ')}.`);
             return;
         }
 
