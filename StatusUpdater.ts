@@ -96,11 +96,13 @@ export class StatusUpdater {
             .map(x => x.context)
             .sort();
 
-        if (!this._statusesEqual(actualStatuses, requiredStatuses)) {
-            console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Not all checks are good.
+        for (let status of requiredStatuses) {
+            if (!actualStatuses.includes(status)) {
+                console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Not all checks are good.
     ActualStatuses: ${actualStatuses.join(', ')}.
     RequiredStatuses: ${requiredStatuses.join(', ')}.`);
-            return;
+                return;
+            }
         }
 
         console.log(`StatusUpdater: merge for PR#${pr.id} is allowed. All checks good.`);
@@ -120,10 +122,10 @@ export class StatusUpdater {
         const [newStatuses, newEtag] = await this._github.GetRequiredStatuses(repository, branch, token, etag);
         if (newEtag != etag) {
             await this._dal.setRequiredStatuses(repository, branch, newStatuses, newEtag);
-            return newStatuses;
+            return newStatuses.sort();
         }
 
-        return statuses;
+        return statuses.sort();
     }
 
     private async _getCombinedStatus(pr: PullRequest, token: string) {
