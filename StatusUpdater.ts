@@ -69,12 +69,6 @@ export class StatusUpdater {
             await this._dal.savePullRequest(pr);
         }
 
-        const combinedStatus = await this._getCombinedStatus(pr, token);
-        if (combinedStatus.state != "success") {
-            console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. Combined status is ${combinedStatus.state}.`);
-            return;
-        }
-
         if (pr.github.state != "open") {
             console.log(`StatusUpdater: merge for PR#${pr.id} is not allowed. PR state is ${pr.github.state}.`);
             return;
@@ -91,6 +85,7 @@ export class StatusUpdater {
         }
 
         const requiredStatuses = await this._getRequiredStatuses(pr.repository, pr.github.base.ref, token);
+        const combinedStatus = await this._getCombinedStatus(pr, token);
         const actualStatuses = combinedStatus.statuses
             .filter(x => x.state == "success")
             .map(x => x.context)
