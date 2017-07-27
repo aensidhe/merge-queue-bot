@@ -13,7 +13,7 @@ export class TelegramUser {
 
     getMention() : string {
         if (this.username)
-            return `@${this.username}`;
+            return `@${this.username.replace("_", "\\_")}`;
 
         let result;
         if (this.lastName)
