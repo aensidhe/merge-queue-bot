@@ -9,3 +9,5 @@ services:
       TARANTOOL_USER_PASSWORD: operator
     volumes:
       - ./tarantool:/opt/tarantool:ro
+    ports:
+      - 33010:3301
