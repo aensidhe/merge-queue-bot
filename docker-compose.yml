@@ -1,0 +1,11 @@
+version: '3.3'
+
+services:
+  tarantool:
+    image: tarantool/tarantool:1.7
+    command: tarantool /opt/tarantool/app.lua
+    environment:
+      TARANTOOL_USER_NAME: operator
+      TARANTOOL_USER_PASSWORD: operator
+    volumes:
+      - ./tarantool:/opt/tarantool:ro
