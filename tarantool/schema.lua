@@ -1,5 +1,5 @@
 local function create_users_space()
-    -- local sequence =  box.schema.sequence.create('UserIdGenerator')
+    local sequence =  box.schema.sequence.create('user_id')
     local space = box.schema.space.create("users", {
         if_not_exists = true,
         format = {
@@ -12,12 +12,13 @@ local function create_users_space()
         type= "TREE",
         unique = true,
         if_not_exists = true,
-        -- sequence = sequence.name,
+        sequence = sequence.name,
         parts = { 1, "unsigned" }
     })
 end
 
 local function create_repositories_space()
+    local sequence =  box.schema.sequence.create('repository_id')
     local space = box.schema.space.create("repository", {
         if_not_exists = true,
         format = {
@@ -32,6 +33,7 @@ local function create_repositories_space()
         type= "TREE",
         unique = true,
         if_not_exists = true,
+        sequence = sequence.name,
         parts = { 1, "unsigned" }
     })
 
@@ -44,6 +46,7 @@ local function create_repositories_space()
 end
 
 local function create_pull_requests_space()
+    local sequence =  box.schema.sequence.create('pull_request_id')
     local main_space = box.schema.space.create("pull_requests", {
         if_not_exists = true,
         format = {
@@ -60,6 +63,7 @@ local function create_pull_requests_space()
         type= "TREE",
         unique = true,
         if_not_exists = true,
+        sequence = sequence.name,
         parts = { 1, "unsigned" }
     })
 
@@ -99,11 +103,13 @@ local function create_pull_requests_space()
         type= "TREE",
         unique = true,
         if_not_exists = true,
+        sequence = sequence.name,
         parts = { 1, "unsigned" }
     })
 end
 
 local function create_token_space()
+    local sequence =  box.schema.sequence.create('sequence_id')
     local space = box.schema.space.create("github_tokens", {
         if_not_exists = true,
         format = {
