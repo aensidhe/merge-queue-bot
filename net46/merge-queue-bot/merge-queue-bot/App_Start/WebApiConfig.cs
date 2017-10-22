@@ -1,6 +1,15 @@
-﻿using System.Web.Http;
+﻿using System.Diagnostics;
+using System.Reflection;
+using System.Web.Http;
+using System.Web.Http.ExceptionHandling;
+using AenSidhe.MergeQueueBot.Repositories;
+using Autofac;
+using Autofac.Integration.WebApi;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+using ProGaudi.MsgPack.Light;
+using ProGaudi.Tarantool.Client;
+using ProGaudi.Tarantool.Client.Model;
 
 namespace AenSidhe.MergeQueueBot
 {
@@ -29,6 +38,55 @@ namespace AenSidhe.MergeQueueBot
                 "api/{controller}/{id}",
                 new { id = RouteParameter.Optional }
             );
+
+            var builder = new ContainerBuilder();
+
+            // Register your Web API controllers.
+            builder.RegisterApiControllers(Assembly.GetExecutingAssembly());
+
+            // OPTIONAL: Register the Autofac filter provider.
+            builder.RegisterWebApiFilterProvider(config);
+
+            builder.RegisterMsgPack();
+            builder.Register(x => new ClientOptions("operator:operator@localhost:33010")).SingleInstance();
+            builder.Register<ILog>(x => null).SingleInstance();
+            builder.RegisterBox();
+
+            builder.RegisterAssemblyTypes(typeof(WebApiApplication).Assembly)
+                .InNamespace(typeof(UserRepository).Namespace)
+                .AsImplementedInterfaces();
+
+            builder.RegisterType<TraceExceptionLogger>().As<IExceptionLogger>().SingleInstance();
+
+            // Set the dependency resolver to be Autofac.
+            var container = builder.Build();
+            config.DependencyResolver = new AutofacWebApiDependencyResolver(container);
+        }
+    }
+
+    public class TraceExceptionLogger : ExceptionLogger
+    {
+        public override void Log(ExceptionLoggerContext context)
+        {
+            Trace.TraceError(context.ExceptionContext.Exception.ToString());
+        }
+    }
+
+    public static class MsgPackExtensions
+    {
+        public static void RegisterMsgPack(this ContainerBuilder builder)
+        {
+            var msgPackContext = new MsgPackContext();
+            msgPackContext.DiscoverConverters<WebApiApplication>();
+            builder.Register(x => msgPackContext).SingleInstance();
+        }
+    }
+
+    public static class TarantoolExtensions
+    {
+        public static void RegisterBox(this ContainerBuilder builder)
+        {
+            builder.RegisterType<Box>().As<IBox>().SingleInstance();
         }
     }
 }

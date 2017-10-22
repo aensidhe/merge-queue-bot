@@ -4,7 +4,8 @@ local function create_users_space()
         if_not_exists = true,
         format = {
             { name="id", type="unsigned" },
-            { name="name", type="string" }
+            { name="name", type="string" },
+            { name="externalId", type="string" }
         }
     })
 
@@ -14,6 +15,13 @@ local function create_users_space()
         if_not_exists = true,
         sequence = sequence.name,
         parts = { 1, "unsigned" }
+    })
+
+    space:create_index('external', {
+        type= "HASH",
+        unique = true,
+        if_not_exists = true,
+        parts = { 3, "string" }
     })
 end
 

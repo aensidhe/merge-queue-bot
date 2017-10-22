@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
 using AenSidhe.MergeQueueBot.Dialogs;
+using AenSidhe.MergeQueueBot.Repositories;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Connector;
 
@@ -12,28 +13,40 @@ namespace AenSidhe.MergeQueueBot.Controllers
     [BotAuthentication]
     public class MessagesController : ApiController
     {
+        private readonly IQueryableRepository<User> _userQueryRepository;
+        private readonly IUpdatableRepository<User> _userUpdateRepository;
+
+        public MessagesController(IQueryableRepository<User> userQueryRepository, IUpdatableRepository<User> userUpdateRepository)
+        {
+            _userQueryRepository = userQueryRepository;
+            _userUpdateRepository = userUpdateRepository;
+        }
+
         /// <summary>
         /// POST: api/Messages
         /// Receive a message from a user and reply to it
         /// </summary>
         public async Task<HttpResponseMessage> Post([FromBody]Activity activity)
         {
-            try
+            if (activity.Type == ActivityTypes.Message)
             {
-                if (activity.Type == ActivityTypes.Message)
-                {
-                    await Conversation.SendAsync(activity, () => new RootDialog());
-                }
-                else
-                {
-                    HandleSystemMessage(activity);
-                }
-                return Request.CreateResponse(HttpStatusCode.OK);
+                var currentUser = GetOrCreateUserAsync(activity.From);
+                await Conversation.SendAsync(activity, () => new RootDialog());
             }
-            catch (Exception e)
+            else
             {
-                throw;
+                HandleSystemMessage(activity);
             }
+            return Request.CreateResponse(HttpStatusCode.OK);
+        }
+
+        private async Task<User> GetOrCreateUserAsync(ChannelAccount activityFrom)
+        {
+            var user = await _userQueryRepository.Get(new SelectUserByExternalIdQuery(activityFrom.Id));
+            if (user != null)
+                return user;
+
+            return await _userUpdateRepository.Update(new CreateUserQuery(activityFrom.Name, activityFrom.Id));
         }
 
         private Activity HandleSystemMessage(Activity message)
