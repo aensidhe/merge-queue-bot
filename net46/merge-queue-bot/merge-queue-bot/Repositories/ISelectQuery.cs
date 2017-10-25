@@ -5,6 +5,6 @@ namespace AenSidhe.MergeQueueBot.Repositories
 {
     public interface ISelectQuery<T>
     {
-        Task<T> Process(IBox box, ISchema schema);
+        Task<T> Process(IBox box);
     }
 }

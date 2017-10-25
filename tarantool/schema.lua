@@ -1,5 +1,5 @@
 local function create_users_space()
-    local sequence =  box.schema.sequence.create('user_id')
+    local sequence =  box.schema.sequence.create('user_id', { if_not_exists = true })
     local space = box.schema.space.create("users", {
         if_not_exists = true,
         format = {
@@ -26,7 +26,7 @@ local function create_users_space()
 end
 
 local function create_repositories_space()
-    local sequence =  box.schema.sequence.create('repository_id')
+    local sequence =  box.schema.sequence.create('repository_id', { if_not_exists = true })
     local space = box.schema.space.create("repository", {
         if_not_exists = true,
         format = {
@@ -54,7 +54,7 @@ local function create_repositories_space()
 end
 
 local function create_pull_requests_space()
-    local sequence =  box.schema.sequence.create('pull_request_id')
+    local sequence =  box.schema.sequence.create('pull_request_id', { if_not_exists = true })
     local main_space = box.schema.space.create("pull_requests", {
         if_not_exists = true,
         format = {
@@ -117,7 +117,7 @@ local function create_pull_requests_space()
 end
 
 local function create_token_space()
-    local sequence =  box.schema.sequence.create('sequence_id')
+    local sequence =  box.schema.sequence.create('sequence_id', { if_not_exists = true })
     local space = box.schema.space.create("github_tokens", {
         if_not_exists = true,
         format = {

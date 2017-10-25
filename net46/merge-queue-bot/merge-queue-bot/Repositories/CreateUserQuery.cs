@@ -16,7 +16,7 @@ namespace AenSidhe.MergeQueueBot.Repositories
 
         public async Task<User> Process(IBox box, ISchema schema)
         {
-            var space = await schema.GetSpace("users");
+            var space = schema["users"];
 
             var (id, name, externalId) = (await space.Insert((default(int?), _name, _externalId))).Data[0];
             return new User

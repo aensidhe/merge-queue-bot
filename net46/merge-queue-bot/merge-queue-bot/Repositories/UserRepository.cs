@@ -12,8 +12,8 @@ namespace AenSidhe.MergeQueueBot.Repositories
             _box = box;
         }
 
-        public Task<User> Get(ISelectQuery<User> selectQuery) => selectQuery.Process(_box, _box.GetSchema());
+        public Task<User> Get(ISelectQuery<User> selectQuery) => selectQuery.Process(_box);
 
-        public Task<User> Update(IChangeQuery<User> changeQuery) => changeQuery.Process(_box, _box.GetSchema());
+        public Task<User> Update(IChangeQuery<User> changeQuery) => changeQuery.Process(_box, _box.Schema);
     }
 }
