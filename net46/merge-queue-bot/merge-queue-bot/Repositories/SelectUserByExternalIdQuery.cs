@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
+using AenSidhe.MergeQueueBot.Models;
 using ProGaudi.Tarantool.Client;
 
 namespace AenSidhe.MergeQueueBot.Repositories
 {
-    public class SelectUserByExternalIdQuery : ISelectQuery<User>
+    public class SelectUserByExternalIdQuery : IGetQuery<User>
     {
         private readonly string _userId;
 

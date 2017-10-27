@@ -1,9 +1,9 @@
 ﻿using ProGaudi.MsgPack.Light;
 
-namespace AenSidhe.MergeQueueBot.Repositories
+namespace AenSidhe.MergeQueueBot.Models
 {
     [MsgPackArray]
-    public class User
+    public class GithubToken
     {
         [MsgPackArrayElement(0)]
         public int Id { get; set; }
@@ -12,6 +12,9 @@ namespace AenSidhe.MergeQueueBot.Repositories
         public string Name { get; set; }
 
         [MsgPackArrayElement(2)]
-        public string ExternalId { get; set; }
+        public int OwnerId { get; set; }
+
+        [MsgPackArrayElement(3)]
+        public string Token { get; set; }
     }
 }

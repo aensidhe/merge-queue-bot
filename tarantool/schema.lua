@@ -31,7 +31,7 @@ local function create_repositories_space()
         if_not_exists = true,
         format = {
             { name="id", type="unsigned" },
-            { name="owner", type="string" },
+            { name="organization", type="string" },
             { name="name", type="string" },
             { name="token_id", type="unsigned" }
         }
@@ -45,7 +45,7 @@ local function create_repositories_space()
         parts = { 1, "unsigned" }
     })
 
-    space:create_index('owner_name', {
+    space:create_index('organization_name', {
         type= "TREE",
         unique = true,
         if_not_exists = true,
@@ -132,16 +132,17 @@ local function create_token_space()
         type= "TREE",
         unique = true,
         if_not_exists = true,
+        sequence = sequence.name,
         parts = { 1, "unsigned" }
     })
 
-    space:create_index('primary', {
+    space:create_index('user_id', {
         type= "TREE",
         if_not_exists = true,
         parts = { 3, "unsigned" }
     })
 
-    space:create_index('primary', {
+    space:create_index('user_id_name', {
         type= "HASH",
         unique = true,
         if_not_exists = true,

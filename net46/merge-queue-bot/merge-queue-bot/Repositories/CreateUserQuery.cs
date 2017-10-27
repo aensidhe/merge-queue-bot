@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using AenSidhe.MergeQueueBot.Models;
 using ProGaudi.Tarantool.Client;
 
 namespace AenSidhe.MergeQueueBot.Repositories
@@ -14,9 +15,9 @@ namespace AenSidhe.MergeQueueBot.Repositories
             _externalId = externalId;
         }
 
-        public async Task<User> Process(IBox box, ISchema schema)
+        public async Task<User> Process(IBox box)
         {
-            var space = schema["users"];
+            var space = box.Schema["users"];
 
             var (id, name, externalId) = (await space.Insert((default(int?), _name, _externalId))).Data[0];
             return new User

@@ -3,7 +3,7 @@ using ProGaudi.Tarantool.Client;
 
 namespace AenSidhe.MergeQueueBot.Repositories
 {
-    public interface IChangeQuery<T>
+    public interface IGetQuery<T>
     {
         Task<T> Process(IBox box);
     }

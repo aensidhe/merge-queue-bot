@@ -53,9 +53,7 @@ namespace AenSidhe.MergeQueueBot
             builder.Register<ILog>(x => null).SingleInstance();
             builder.RegisterBox();
 
-            builder.RegisterAssemblyTypes(typeof(WebApiApplication).Assembly)
-                .InNamespace(typeof(UserRepository).Namespace)
-                .AsImplementedInterfaces();
+            builder.RegisterGeneric(typeof(TarantoolRepository<>)).AsImplementedInterfaces();
 
             builder.RegisterType<TraceExceptionLogger>().As<IExceptionLogger>().SingleInstance();
 

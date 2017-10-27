@@ -161,7 +161,7 @@
   <ItemGroup>
     <Compile Include="App_Start\WebApiConfig.cs" />
     <Compile Include="Controllers\MessagesController.cs" />
-    <Compile Include="Dialogs\AddPullRequestDialog.cs" />
+    <Compile Include="Dialogs\PromptStringRegex.cs" />
     <Compile Include="Dialogs\RemovePullRequestDialog.cs" />
     <Compile Include="Dialogs\RootDialog.cs" />
     <Compile Include="Global.asax.cs">
@@ -169,13 +169,28 @@
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Repositories\CreateUserQuery.cs" />
+    <Compile Include="Models\GithubRepository.cs" />
+    <Compile Include="Models\GithubToken.cs" />
     <Compile Include="Repositories\IChangeQuery.cs" />
+    <Compile Include="Repositories\IGetQuery.cs" />
     <Compile Include="Repositories\IQueryableRepository.cs" />
     <Compile Include="Repositories\ISelectQuery.cs" />
     <Compile Include="Repositories\IUpdatableRepository.cs" />
+    <Compile Include="Models\PullRequest.cs" />
+    <Compile Include="Repositories\TarantoolRepository.cs" />
+    <Compile Include="Models\PullRequestState.cs" />
     <Compile Include="Repositories\SelectUserByExternalIdQuery.cs" />
-    <Compile Include="Repositories\User.cs" />
-    <Compile Include="Repositories\UserRepository.cs" />
+    <Compile Include="Models\User.cs" />
+    <Compile Include="Repositories\CreateNewTokenQuery.cs" />
+    <Compile Include="Repositories\DeleteUserToken.cs" />
+    <Compile Include="Repositories\GetToken.cs" />
+    <Compile Include="Repositories\GetUserTokens.cs" />
+    <Compile Include="Repositories\MapTokenToRepoQuery.cs" />
+    <Compile Include="Services\QueueService.cs" />
+    <Compile Include="Services\RepositoryService.cs" />
+    <Compile Include="Services\TokenService.cs" />
+    <Compile Include="Repositories\UnmapTokenFromRepoQuery.cs" />
+    <Compile Include="Services\UserService.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config">
@@ -188,6 +203,7 @@
       <DependentUpon>Web.config</DependentUpon>
     </None>
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>

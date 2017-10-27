@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
 using AenSidhe.MergeQueueBot.Dialogs;
+using AenSidhe.MergeQueueBot.Models;
 using AenSidhe.MergeQueueBot.Repositories;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Connector;
