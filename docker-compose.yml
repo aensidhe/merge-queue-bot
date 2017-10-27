@@ -2,9 +2,7 @@ version: '3.3'
 
 services:
   tarantool:
-    build:
-      context: tarantool/docker-image/1.7
-    image: tarantool/tarantool:1.7.5-185-g1ebaad6
+    image: progaudi/tarantool:1.7.5-242-g0b9fa5978
     command: tarantool /opt/tarantool/app.lua
     environment:
       TARANTOOL_USER_NAME: operator
